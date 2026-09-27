@@ -1,7 +1,29 @@
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
-const require = createRequire('C:/Users/111/.workbuddy/binaries/node/workspace/');
-const { JSDOM } = require('jsdom');
+
+/* jsdom 的解析要能同时应付两种环境：
+   - CI / 全新克隆：jsdom 装在仓库根目录的 node_modules 里
+   - 本机：jsdom 装在托管运行时的工作区里，项目内没有
+   所以依次尝试几个基准位置，而不是写死某台机器的绝对路径
+   （原先写死成 C:/Users/... ，在 Linux 的 CI 上必然失败）。 */
+function loadJsdom() {
+  const bases = [
+    import.meta.url,
+    'file:///C:/Users/111/.workbuddy/binaries/node/workspace/',
+  ];
+  const tried = [];
+  for (const base of bases) {
+    try {
+      return createRequire(base)('jsdom');
+    } catch (e) {
+      tried.push(`${base} → ${e.code || e.message}`);
+    }
+  }
+  console.error('无法加载 jsdom，请先 `npm install --no-save jsdom`。已尝试：');
+  for (const t of tried) console.error('  ' + t);
+  process.exit(1);
+}
+const { JSDOM } = loadJsdom();
 
 const html = fs.readFileSync(new URL('../学习目标管理台.html', import.meta.url), 'utf8');
 const T = new Date();

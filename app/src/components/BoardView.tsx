@@ -7,10 +7,12 @@ interface Props {
   views: GoalView[]
   logs: Log[]
   onCheckIn: (id: string) => void
+  /** 可注入的「今天」，便于确定性测试 */
+  today?: string
 }
 
 /** 看板页：目标卡片网格 + 14 天图表 */
-export function BoardView({ views, logs, onCheckIn }: Props) {
+export function BoardView({ views, logs, onCheckIn, today }: Props) {
   return (
     <section className="px-5 space-y-4">
       <h2 className="serif text-lg font-semibold">看板</h2>
@@ -25,7 +27,7 @@ export function BoardView({ views, logs, onCheckIn }: Props) {
           ))}
         </div>
       )}
-      <Chart14d views={views} logs={logs} />
+      <Chart14d views={views} logs={logs} today={today} />
     </section>
   )
 }

@@ -2,11 +2,16 @@
 // 数据走线上三表（真实页面），若网络不可用则仅渲染界面骨架。
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const { chromium } = await import('file:///C:/Users/111/.workbuddy/binaries/node/workspace/node_modules/playwright-core/index.mjs');
 const CHROME = 'C:/Users/111/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
+/* 不能用 new URL(import.meta.url).pathname：中文路径拿到的 percent-encoded 串
+   在 Windows 上会被当成真实目录名，截图会写进 Desktop 下的幽灵目录，
+   而页面因为走 file:// URL 反而加载正确——结果就是「图有内容但是旧图」。
+   详见 shots_data.mjs 里的同一处注释。 */
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = 'file:///' + path.join(ROOT, '学习目标管理台.html').replace(/\\/g, '/');
 const OUT = path.join(ROOT, 'build', 'shots');
 fs.mkdirSync(OUT, { recursive: true });

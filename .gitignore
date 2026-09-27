@@ -6,6 +6,14 @@ app/dist/
 __pycache__/
 *.pyc
 
+# TypeScript 增量编译缓存 / 覆盖率报告
+*.tsbuildinfo
+coverage/
+.tmp/
+
+# Vitest 在打包配置文件时留下的临时产物（形如 vitest.config.ts.timestamp-1234-abcd.mjs）
+*.timestamp-*.mjs
+
 # ---------- 实拍截图（体积大，不入库）----------
 build/shots/
 build/shots2/

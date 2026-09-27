@@ -1,4 +1,4 @@
-import { humanDue } from '@/lib/date'
+import { dueLabel } from '@/lib/eta'
 import { STATUS_COLOR } from '@/lib/palette'
 import type { GoalView, Log } from '@/types'
 import { isoDate } from '@/lib/date'
@@ -7,11 +7,13 @@ interface Props {
   views: GoalView[]
   logs: Log[]
   onCheckIn: (goalId: string) => void
+  /** 可注入的「今天」，便于确定性测试 */
+  today?: string
 }
 
 /** 今日打卡表 */
-export function TodayTable({ views, logs, onCheckIn }: Props) {
-  const today = isoDate()
+export function TodayTable({ views, logs, onCheckIn, today: todayProp }: Props) {
+  const today = todayProp ?? isoDate()
   const todayLogs = logs.filter((l) => l.date === today)
 
   return (
@@ -55,7 +57,7 @@ export function TodayTable({ views, logs, onCheckIn }: Props) {
                     <span className="text-xs text-muted w-10 text-right">{pct}%</span>
                   </div>
                   <p className="text-xs mt-0.5" style={{ color: STATUS_COLOR[g.status] }}>
-                    {humanDue(g.dueDays)}
+                    {dueLabel(g.status, g.dueDays)}
                   </p>
                 </div>
                 <button

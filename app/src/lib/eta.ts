@@ -8,14 +8,17 @@
  * 4. 状态判定：进度=1 → done；逾期 → overdue；ETA > 剩余可用天数 → at-risk；否则 on-track
  */
 
-import { daysBetween, isoDate, mondayOf, recentDays } from './date'
+import { daysBetween, humanDue, isoDate, mondayOf, recentDays } from './date'
 import type { Goal, GoalView, Log } from '@/types'
 
 const REST_DAY = 0 // 周日为休息日（0=周日）
 
 /** 计算单个目标的运行时视图 */
 export function buildGoalView(goal: Goal, logs: Log[], today: string = isoDate()): GoalView {
-  const seven = recentDays(7)
+  // 近 7 天窗口必须以传入的 today 为基准。
+  // 之前这里写成 recentDays(7)（隐式取真实当天），导致 today 参数只影响状态判定、
+  // 不影响日均速度，函数无法被确定性测试。
+  const seven = recentDays(7, today)
   const goalLogs = logs.filter((l) => l.goalId === goal.id)
 
   // 近 7 天有效打卡量（剔除休息日）
@@ -60,6 +63,17 @@ export function buildGoalView(goal: Goal, logs: Log[], today: string = isoDate()
 export function hasReviewThisWeek(reviews: { weekStart: string }[], today: string = isoDate()): boolean {
   const mon = mondayOf(today)
   return reviews.some((r) => r.weekStart === mon)
+}
+
+/**
+ * 截止日文案 —— 已完成的目标不再报「逾期 N 天」
+ *
+ * 一个 100% 完成的目标，卡片底下如果还标红写着「逾期 10 天」，
+ * 读起来像是还有事没做完。完成就是完成，统一说「已达成」。
+ * 逾期只对「还没做完且已经过期」的目标有意义。
+ */
+export function dueLabel(status: GoalView['status'], dueDays: number): string {
+  return status === 'done' ? '已达成' : humanDue(dueDays)
 }
 
 /** 统计某目标在指定日期范围内的每日打卡量（用于图表） */

@@ -1,0 +1,76 @@
+name: Deploy demo
+
+# 把工程化版的构建产物发布到 GitHub Pages，做成一个「点开就能看」的演示页。
+#
+# 一次性设置：仓库 Settings → Pages → Build and deployment → Source 选
+# 「GitHub Actions」。之后每次推到 main 都会自动重新发布。
+#
+# 这里不需要给 Vite 传 --base：app/vite.config.ts 里已经设了 base: './'，
+# 产物引用全是相对路径，放在 /Check-in-activity/ 这种子路径下也能正常加载。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同时只允许一次发布；但不要打断正在进行的发布，否则线上可能停留在半成品
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建演示页
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建
+        run: npm run build
+
+      - name: 断言产物引用的是相对路径
+        working-directory: .
+        run: |
+          if grep -qE '(src|href)="/' app/dist/index.html; then
+            echo "::error::产物里出现了绝对路径引用，部署到子路径会 404 白屏。检查 vite.config.ts 的 base 是否为 './'。"
+            cat app/dist/index.html
+            exit 1
+          fi
+          echo "产物引用均为相对路径"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/dist
+
+  deploy:
+    name: 发布
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

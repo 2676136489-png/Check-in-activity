@@ -32,10 +32,10 @@ export function mondayOf(d: string): string {
   return offsetDays(diff, d)
 }
 
-/** 最近 n 天的 ISO 日期数组（含今天，从旧到新） */
-export function recentDays(n: number): string[] {
+/** 最近 n 天的 ISO 日期数组（含 base 当天，从旧到新） */
+export function recentDays(n: number, base: string = isoDate()): string[] {
   const out: string[] = []
-  for (let i = n - 1; i >= 0; i--) out.push(offsetDays(-i))
+  for (let i = n - 1; i >= 0; i--) out.push(offsetDays(-i, base))
   return out
 }
 

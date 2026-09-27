@@ -4,11 +4,14 @@ import type { Goal, Log, Review } from '@/types'
 interface Props {
   onExport: () => Promise<{ goals: Goal[]; logs: Log[]; reviews: Review[] }>
   onImport: (data: { goals: Goal[]; logs: Log[]; reviews: Review[] }) => Promise<void>
+  onLoadSample: () => Promise<void>
+  onClearAll: () => Promise<void>
+  hasSample: boolean
   repoKind: string
 }
 
 /** 我的页：数据备份还原 + 说明 */
-export function MineView({ onExport, onImport, repoKind }: Props) {
+export function MineView({ onExport, onImport, onLoadSample, onClearAll, hasSample, repoKind }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleExport = async () => {
@@ -36,6 +39,16 @@ export function MineView({ onExport, onImport, repoKind }: Props) {
     e.target.value = ''
   }
 
+  const handleLoadSample = async () => {
+    if (!confirm('载入示例数据会先清空当前的全部数据。确定继续？')) return
+    await onLoadSample()
+  }
+
+  const handleClearAll = async () => {
+    if (!confirm('会删掉全部目标、打卡记录和复盘，且不可撤销。确定继续？')) return
+    await onClearAll()
+  }
+
   return (
     <section className="px-5 space-y-4">
       <h2 className="serif text-lg font-semibold">我的</h2>
@@ -57,6 +70,15 @@ export function MineView({ onExport, onImport, repoKind }: Props) {
             className="hidden"
             onChange={handleImport}
           />
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-3 border-t border-hairline">
+          <button className="btn-ghost hairline" onClick={handleLoadSample}>
+            {hasSample ? '重置示例数据' : '载入示例数据'}
+          </button>
+          <button className="btn-ghost hairline text-[#a2382c]" onClick={handleClearAll}>
+            清除全部数据
+          </button>
         </div>
       </div>
 

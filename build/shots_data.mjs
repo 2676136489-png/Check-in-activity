@@ -2,26 +2,35 @@
 // 目的是看「有数据时」的目标卡、看板、周报在各端宽下的真实观感。
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const { chromium } = await import('file:///C:/Users/111/.workbuddy/binaries/node/workspace/node_modules/playwright-core/index.mjs');
 const CHROME = 'C:/Users/111/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
+/* 注意：这里不能用 new URL(import.meta.url).pathname。
+   它对中文路径返回的是 percent-encoded 形式（/D:/.../%E5%AD%A6%E4%B9%A0...），
+   Windows 会把它当成一个真实存在的目录名。之前这个 bug 的后果很隐蔽：
+   读页面走的是 file:// URL（Chrome 会解码 → 加载正确文件），
+   写截图走的是上面那个未解码的路径（→ 全部落进 Desktop 下的幽灵目录），
+   于是「截图看着有内容，其实是几小时前的旧图」，页面改了也看不出来。
+   fileURLToPath 会正确解码成真实路径。 */
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = 'file:///' + path.join(ROOT, '学习目标管理台.html').replace(/\\/g, '/');
 const OUT = path.join(ROOT, 'build', 'shots2');
 fs.mkdirSync(OUT, { recursive: true });
 
 /* 预置与页面「示例数据」一致的三组目标 + 最近几天的打卡记录，
-   用来观察有数据时目标卡/看板/周报的真实观感。 */
+   用来观察有数据时目标卡/看板/周报的真实观感。
+   配色取 v2 学术纸感的低饱和板（v1 的 #6366f1 那套已经不用了）。 */
 const T = new Date();
 const D = (n) => { const d = new Date(T); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const MON = (() => { const d = new Date(T); const w = (d.getDay() + 6) % 7; d.setDate(d.getDate() - w); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
 const DB_G = 'BIidtdjTZqaX8pBamGfpwG', DB_L = 'EWKqAtHl8V6s9UaAHpYd69', DB_R = 'bMjplT6TsrTmhwH8BxZKIE';
 
 const GOALS = [
-  { id: 'g1', name: '背完考研核心词', unit: '个', total: 2000, due: D(45), color: '#6366f1', blocker: '晚上一躺下就开始刷手机', counter: '把手机放到客厅，先背 20 个再拿回来', seed: 1 },
-  { id: 'g2', name: '读完《人类简史》', unit: '页', total: 440, due: D(-3), color: '#f59e0b', blocker: '加班回来太累', counter: '只看 10 页也算数', seed: 1 },
-  { id: 'g3', name: 'Python 入门课', unit: '节', total: 60, due: D(30), color: '#10b981', blocker: '', counter: '', seed: 1 },
+  { id: 'g1', name: '背完考研核心词', unit: '个', total: 2000, due: D(45), color: '#2c6b5c', blocker: '晚上一躺下就开始刷手机', counter: '把手机放到客厅，先背 20 个再拿回来', seed: 1 },
+  { id: 'g2', name: '读完《人类简史》', unit: '页', total: 440, due: D(-3), color: '#9a6b2e', blocker: '加班回来太累', counter: '只看 10 页也算数', seed: 1 },
+  { id: 'g3', name: 'Python 入门课', unit: '节', total: 60, due: D(30), color: '#3a6b8c', blocker: '', counter: '', seed: 1 },
 ];
 const LOGS = [];
 const AMTS = { g1: [120, 80, 150, 100, 60, 90], g2: [30, 20, 0, 25, 15, 18], g3: [2, 3, 1, 2, 0, 2] };

@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  app:
+    name: React 版 · lint / 类型 / 单测 / 渲染冒烟 / 构建
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: ESLint（含 react-hooks/rules-of-hooks）
+        run: npm run lint
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 单元测试
+        run: npm test
+
+      - name: 渲染冒烟（SSR）
+        run: npm run smoke
+
+      - name: 生产构建
+        run: npm run build
+
+  artifact-reproducible:
+    name: 单文件版 · 产物可复现
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 用构建脚本重新合成单文件产物
+        run: python build/merge.py
+
+      - name: 断言产物与仓库中的文件逐字节一致
+        run: |
+          if ! git diff --exit-code -- 学习目标管理台.html; then
+            echo "::error::build/merge.py 重新合成的产物与仓库里的 学习目标管理台.html 不一致——说明产物被手工改过、或者源片段没同步回去。"
+            exit 1
+          fi
+          echo "产物可复现"
+
+  single-file-smoke:
+    name: 单文件版 · 页面交互冒烟
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装 jsdom
+        run: npm install --no-save jsdom
+
+      - name: 跑 smoke.mjs
+        run: node build/smoke.mjs
+
+  secret-scan:
+    name: 敏感信息扫描
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 模式拆成数组再拼，是为了避免这行扫描规则把「自己」扫出来。
+      # 直接写成一条长正则的话，规则文本本身就会命中规则。
+      - name: 扫描高危及私钥特征
+        shell: bash
+        run: |
+          patterns=(
+            'sk-[A-Za-z0-9]{16,}'
+            'ghp_[A-Za-z0-9]{20,}'
+            'github_pat_[A-Za-z0-9_]{20,}'
+            'AKIA[0-9A-Z]{16}'
+            '-----BEGIN [A-Z ]*PRIVATE KEY-----'
+            'xox[baprs]-'
+            'AIza[0-9A-Za-z_-]{30,}'
+          )
+          pat=$(IFS='|'; printf '%s' "${patterns[*]}")
+
+          hits=$(grep -rInE "$pat" \
+            --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist . || true)
+
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::检测到疑似凭据，禁止入库。"
+            exit 1
+          fi
+          echo "未发现疑似凭据"
