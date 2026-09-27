@@ -1,0 +1,46 @@
+# ---------- 依赖与构建产物 ----------
+node_modules/
+dist/
+app/dist/
+.vite/
+__pycache__/
+*.pyc
+
+# ---------- 实拍截图（体积大，不入库）----------
+build/shots/
+build/shots2/
+build/shots_new/
+build/shots_empty/
+
+# ---------- 清空前的线上数据备份（含真实记录，不入库）----------
+build/backup_before_clear/
+
+# ---------- 本地临时目录 ----------
+_remote_check/
+clone_work/
+
+# ---------- 工具链本地元数据（工作日志等，不入库）----------
+.workbuddy/
+
+# ---------- 本地取数脚本的临时输出 ----------
+out_*.json
+t.json
+
+# ---------- 环境变量与凭据：绝不入库 ----------
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+.netrc
+.npmrc
+
+# ---------- 编辑器与系统 ----------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log

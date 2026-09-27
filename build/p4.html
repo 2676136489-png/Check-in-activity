@@ -1,0 +1,406 @@
+
+/* =======================================================================
+   5. 计算层（纯函数，只读状态、不改状态）
+   ======================================================================= */
+function remainOf(goal) { return Math.max(0, (Number(goal.total) || 0) - goalDone(goal)); }
+function isDone(goal) { return (Number(goal.total) || 0) > 0 && goalDone(goal) >= (Number(goal.total) || 0); }
+function pctOf(goal) { if (!(Number(goal.total) > 0)) return 0; return clamp(goalDone(goal) / goal.total * 100, 0, 100); }
+function overdueDays(goal) { var d = diffDays(todayStr(), goal.due); return d < 0 ? -d : 0; }
+function daysLeftOf(goal) { return diffDays(todayStr(), goal.due); }        /* 距截止日还剩几天（不含今天） */
+function suggestOf(goal) {
+  var rem = remainOf(goal);
+  if (rem <= 0) return 0;
+  var dl = daysLeftOf(goal);
+  if (dl < 0) return Math.ceil(rem);
+  return Math.max(1, Math.ceil(rem / (dl + 1)));
+}
+function dateSetOf(goal) {
+  var m = {};
+  for (var i = 0; i < S.logs.length; i++) {
+    var l = S.logs[i];
+    if (l.goalId === goal.id && (Number(l.amount) || 0) > 0) m[l.date] = 1;
+  }
+  return m;
+}
+function firstLogDate(goal) {
+  var best = '';
+  for (var i = 0; i < S.logs.length; i++) {
+    var d = S.logs[i].goalId === goal.id ? S.logs[i].date : '';
+    if (d && (best === '' || d < best)) best = d;
+  }
+  return best;
+}
+function computeStreak(goal) {
+  var m = dateSetOf(goal), t = todayStr();
+  var starts = firstLogDate(goal) || t;
+  var cur = m[t] ? t : addDays(t, -1);
+  var streak = 0, used = {}, guard = 0;
+  while (guard++ < 500) {
+    if (cur < starts) break;
+    if (m[cur]) { streak++; }
+    else {
+      var wk = mondayOf(cur);
+      if (!used[wk]) { used[wk] = true; }   /* 本周第一次漏：用掉休息日，不中断 */
+      else break;
+    }
+    cur = addDays(cur, -1);
+  }
+  return streak;
+}
+function yesterdayState(goal) {
+  var y = addDays(todayStr(), -1), m = dateSetOf(goal);
+  if (m[y]) return 'ok';
+  if (isDone(goal)) return 'done';
+  var wk = mondayOf(y), d = wk, missBefore = 0, starts = firstLogDate(goal) || y;
+  while (d < y) {
+    if (d >= starts && !m[d]) missBefore++;
+    d = addDays(d, 1);
+  }
+  return missBefore === 0 ? 'rest' : 'broken';
+}
+function restUsedThisWeek(goal) {
+  var m = dateSetOf(goal), t = todayStr(), wk = mondayOf(t), miss = 0, d = wk;
+  while (d <= t) {
+    if (d !== t && !m[d] && d >= (firstLogDate(goal) || d)) miss++;
+    d = addDays(d, 1);
+  }
+  return miss;
+}
+function etaOf(goal) {
+  var rem = remainOf(goal);
+  if (rem <= 0) return { state: 'done' };
+  var t = todayStr(), sum = 0, days = 0, i, j;
+  for (i = 0; i < 7; i++) {
+    var d = addDays(t, -i), amt = 0, has = false;
+    for (j = 0; j < S.logs.length; j++) {
+      var l = S.logs[j];
+      if (l.goalId === goal.id && l.date === d) { amt += (Number(l.amount) || 0); has = true; }
+    }
+    if (has && amt > 0) { sum += amt; days++; }
+  }
+  if (days < 3 || sum <= 0) return { state: 'none' };   /* 样本不足，绝不编数字 */
+  var avg = sum / 7;
+  var need = Math.ceil(rem / avg);
+  if (!(need > 0) || need > 3650) return { state: 'none' };
+  var eta = addDays(t, need);
+  return { state: 'ok', eta: eta, need: need, diff: diffDays(eta, goal.due) };
+}
+function etaText(goal) {
+  var e = etaOf(goal);
+  if (e.state === 'done') return { v: '已完成', cls: 'g' };
+  if (e.state === 'none') return { v: '暂无推算', cls: 'm' };
+  var tail = e.diff > 0 ? ('提前 ' + e.diff + ' 天') : (e.diff < 0 ? ('拖后 ' + (-e.diff) + ' 天') : '正好赶上');
+  return { v: mdShort(e.eta), cls: e.diff >= 0 ? 'g' : 'r', sub: tail, eta: e.eta };
+}
+function todayAmount(goal) {
+  var t = todayStr(), s = 0;
+  for (var i = 0; i < S.logs.length; i++) { var l = S.logs[i]; if (l.goalId === goal.id && l.date === t) s += (Number(l.amount) || 0); }
+  return s;
+}
+function goalRank(goal) {
+  var st = yesterdayState(goal);
+  if (st === 'broken' || st === 'rest') return 0;
+  if (overdueDays(goal) > 0 && !isDone(goal)) return 1;
+  if (isDone(goal)) return 3;
+  return 2;
+}
+function sortedGoals() {
+  return S.goals.slice().sort(function (a, b) {
+    var ra = goalRank(a), rb = goalRank(b);
+    if (ra !== rb) return ra - rb;
+    return (a.sort || 0) - (b.sort || 0);
+  });
+}
+
+/* =======================================================================
+   6. SVG 图标
+   ======================================================================= */
+function ic(name, size, sw) {
+  var s = size || 16, w = sw || 2;
+  var P = {
+    edit: '<path d="M4 20h4l10-10a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5z"/><path d="M13.5 6.5 17.5 10.5"/>',
+    trash: '<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/>',
+    check: '<path d="M5 12.5 10 17.5 19 7"/>',
+    warn: '<path d="M12 3 2.5 20h19z"/><path d="M12 9v5.5M12 17.2h.01"/>',
+    coffee: '<path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 10h1.6a2.4 2.4 0 0 1 0 4.8H17"/><path d="M7 3v2M11 3v2"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>',
+    refresh: '<path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 4v7h-7"/>',
+    bolt: '<path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"/>'
+  };
+  return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round">' + (P[name] || '') ' + '';
+}
+
+/* =======================================================================
+   7. 渲染层：同步条
+   ======================================================================= */
+function renderSync() {
+  var zone = document.getElementById('sync-zone'); if (!zone) return;
+  var cfg = {
+    loading: { cls: 'warn', dot: ' pulse', ico: ic('refresh', 15), txt: '正在从线上读取学习数据…' },
+    ok:      { cls: 'ok',   dot: '',        ico: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17.5 19 7"/>' ' + '' + '', txt: '已同步 · 数据存在资料库云端，多设备自动同步' },
+    offline: { cls: 'warn', dot: ' pulse', ico: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 13a10 10 0 0 1 4-2.4M19 13a10 10 0 0 0-6-3"/>' ' + '' + '', txt: '离线模式 · 已用本机缓存，改的东西先存本地' },
+    error:   { cls: 'err',  dot: ' pulse', ico: ic('warn', 15), txt: '读取线上数据失败，当前显示的是本机缓存' }
+  };
+  var c = cfg[SYNC.status] || cfg.loading;
+  var lastTxt = SYNC.last ? ('上次同步 ' + SYNC.last) : '';
+  var msgTxt = (SYNC.status !== 'ok' && SYNC.msg) ? '<div class="sync-msg">' + esc(SYNC.msg) ' + '' : '';
+  zone.innerHTML = escapeHTML(
+    '<div class="syncbar ' + c.cls + '"><span class="dot-state' + c.dot + '">' ' + '' + '' + c.ico +
+    '<span class="sp">' + esc(c.txt) + (lastTxt ? '（' + esc(lastTxt) + '）' : '') ' + '' +
+    (SYNC.status === 'ok' ? '' : '<button class="btn btn-sm btn-ghost" data-act="resync" type="button">' + ic('refresh', 14) + '重试' ' + '' + '') ' + '' + msgTxt
+  );
+}
+
+/* =======================================================================
+   8. 渲染层：今日
+   ======================================================================= */
+function dateOptionsHTML(goal) {
+  var t = todayStr(), out = '';
+  for (var i = 0; i <= 6; i++) {
+    var d = addDays(t, -i);
+    var lb = i === 0 ? '今天' : (i === 1 ? '昨天（补记）' : mdShort(d) + '（补记）');
+    out += '<option value="' + d + '">' + lb ' + '';
+  }
+  return out;
+}
+
+function overdueCardHTML(goal, od) {
+  return '<div class="attn red" data-sp-bindable="database" data-sp-database-id="EWKqAtHl8V6s9UaAHpYd69" ><span style="color:var(--red);flex:none">' + ic('warn', 19) + '' ' + '' + '<div class="body">' +
+    '<div class="hd"><span class="nm">' + esc(goal.name) + '' ' + '' + '<span class="badge badge-red">逾期 ' + od + ' 天' ' + '' + '' +
+    '<span class="pill">还剩 ' + nfmt(remainOf(goal)) + ' ' + esc(goal.unit || '') ' + '' ' + '' + '' +
+    '<div class="msg">截止日 ' + mdCN(goal.due) + ' 已经过去 ' + od + ' 天，未完成的量不会自动消失——要么今天补上，要么把计划改成你真能做到的样子。' ' + '' + '' +
+    (goal.blocker ? '<div class="msg" style="margin-top:4px">你写的障碍：' + esc(goal.blocker) ' + '' : '') +
+    (goal.counter ? '<div class="msg">对策：' + esc(goal.counter) ' + '' : '') +
+    '<div class="acts"><button class="btn btn-primary btn-sm" data-act="focus" data-id="' + esc(goal.id) + '" type="button">' + ic('check', 15) + '立即打卡' ' + '' + '' +
+    '<button class="btn btn-ghost btn-sm" data-act="edit" data-id="' + esc(goal.id) + '" type="button">' + ic('edit', 15) + '调整计划' ' + '' + '' ' + '' + '' ' + '' ' + '' + '';
+}
+function restCardHTML(goal) {
+  return '<div class="attn amber" data-sp-bindable="database" data-sp-database-id="EWKqAtHl8V6s9UaAHpYd69" ><span style="color:var(--amber);flex:none">' + ic('coffee', 19) + '' ' + '' + '<div class="body">' +
+    '<div class="hd"><span class="nm">' + esc(goal.name) + '' ' + '' + '<span class="badge badge-amber">本周休息日' ' + '' + '' +
+    '<span class="pill">连续 ' + computeStreak(goal) + ' 天 · 未中断' ' + '' + '' ' + '' + '' +
+    '<div class="msg">昨天没打卡，已自动用掉本周（周一起算）的 1 个休息日，连续天数没有断。本周还剩 ' + Math.max(0, 1 - restUsedThisWeek(goal)) + ' 个休息日。' ' + '' + '' +
+    '<div class="acts"><button class="btn btn-primary btn-sm" data-act="focus" data-id="' + esc(goal.id) + '" type="button">' + ic('check', 15) + '今天补上' ' + '' + '' ' + '' + '' ' + '' ' + '' + '';
+}
+function brokenCardHTML(goal) {
+  return '<div class="attn red" data-sp-bindable="database" data-sp-database-id="EWKqAtHl8V6s9UaAHpYd69" ><span style="color:var(--red);flex:none">' + ic('warn', 19) + '' ' + '' + '<div class="body">' +
+    '<div class="hd"><span class="nm">' + esc(goal.name) + '' ' + '' + '<span class="badge badge-red">已滚入今日' ' + '' + '' +
+    '<span class="pill">今日建议 ' + nfmt(suggestOf(goal)) + ' ' + esc(goal.unit || '') ' + '' ' + '' + '' +
+    '<div class="msg">本周（周一起算）的休息日已经用掉了，昨天再漏一次，连续天数从今天重新算。昨天没做的量已经摊进今天的建议里：今天 ' + nfmt(suggestOf(goal)) + ' ' + esc(goal.unit || '') + '。' ' + '' + '' +
+    (goal.counter ? '<div class="msg" style="margin-top:4px">你写的对策：' + esc(goal.counter) ' + '' : '') +
+    '<div class="acts"><button class="btn btn-primary btn-sm" data-act="focus" data-id="' + esc(goal.id) + '" type="button">' + ic('check', 15) + '立即打卡' ' + '' + '' +
+    '<button class="btn btn-ghost btn-sm" data-act="edit" data-id="' + esc(goal.id) + '" type="button">' + ic('edit', 15) + '调整计划' ' + '' + '' ' + '' + '' ' + '' ' + '' + '';
+}
+/* 同一目标可能同时逾期 + 昨日漏打，两张卡都出 */
+function attnCardsOf(goal) {
+  var out = [], od = overdueDays(goal), st = yesterdayState(goal);
+  if (isDone(goal)) return out;
+  if (od > 0) out.push(overdueCardHTML(goal, od));
+  /* 今天已经打过卡，昨天的提示就算处理掉了，不再重复催 */
+  if (todayAmount(goal) > 0) return out;
+  if (st === 'rest') out.push(restCardHTML(goal));
+  else if (st === 'broken') out.push(brokenCardHTML(goal));
+  return out;
+}
+
+function goalRowHTML(goal) {
+  var done = isDone(goal), pct = pctOf(goal), sug = suggestOf(goal);
+  var ta = todayAmount(goal);
+  var st = computeStreak(goal), et = etaText(goal);
+  var od = overdueDays(goal);
+  return '<div class="goal-row' + (done ? ' done' : '') + '" id="row-' + esc(goal.id) + '" data-sp-bindable="database" data-sp-database-id="BIidtdjTZqaX8pBamGfpwG">' +
+    '<div class="gr-top"><span class="gr-bar" style="background:' + esc(goal.color || COLORS[0]) + '">' ' + '' + '' +
+    '<div class="gr-main">' +
+      '<div class="gr-name">' + esc(goal.name) +
+        (goal.seed ? '<span class="tag-seed">示例' ' + '' + '' : '') +
+        (done ? '<span class="badge" style="background:var(--green);color:#fff">已达成' ' + '' + '' : '') ' + '' +
+      '<div class="gr-sub">目标 ' + nfmt(goal.total) + ' ' + esc(goal.unit || '') + ' · 截止 ' + mdCN(goal.due) +
+        (od > 0 && !done ? ' · <span style="color:var(--red);font-weight:700">已逾期 ' + od + ' 天' ' + '' + '' : '') ' + '' ' + '' +
+    '<div class="gr-acts">' +
+      '<button class="icon-btn" data-act="edit" data-id="' + esc(goal.id) + '" type="button" aria-label="编辑">' + ic('edit', 17) ' + '' +
+      '<button class="icon-btn" data-act="del" data-id="' + esc(goal.id) + '" type="button" aria-label="删除" style="color:var(--ink-3)">' + ic('trash', 17) ' + '' ' + '' ' + '' + '' +
+
+    '<div class="gr-progress"><div class="pbar"><i style="width:' + pct.toFixed(1) + '%;background:linear-gradient(90deg,' + esc(goal.color || COLORS[0]) + ',' + esc(goal.color || COLORS[0]) + 'cc)">' ' + '' + '' ' + '' + '' +
+    '<div class="gr-stats">' +
+      '<span>完成率 <b class="num">' + pct.toFixed(0) + '%' ' + '' + '' ' + '' + '' +
+      '<span>连续 <b class="num">' + st + '' ' + '' + ' 天' ' + '' + '' +
+      '<span>预计完成 <b class="' + et.cls + '">' + esc(et.v) ' + '' + (et.sub ? '（' + esc(et.sub) + '）' : '') ' + '' +
+      '<span>剩余 <b class="num">' + nfmt(remainOf(goal)) + '' ' + '' + ' ' + esc(goal.unit || '') ' + '' ' + '' ' + '' + '' +
+
+    ((goal.blocker || goal.counter) ? '<div class="gr-plan"><span class="k">最容易拦住我的：' ' + '' + '' + esc(goal.blocker || '未填写') +
+      '<br><span class="k">如果它出现，我就：' ' + '' + '' + esc(goal.counter || '未填写') ' + '' : '') +
+
+    (done ? '<div class="gr-log" style="color:var(--green);font-weight:700">' + ic('check', 15) + ' 目标已达成，' + nfmt(goalDone(goal)) + ' ' + esc(goal.unit || '') + ' 全部完成' ' + '' + ''
+      : '<div class="gr-checkin">' +
+        '<div class="fld"><label>完成量（建议 ' + nfmt(sug) + '）' ' + '' + ' + '<input class="fld-amt num" type="number" inputmode="decimal" min="0" step="any" data-f="amt" data-id="' + esc(goal.id) + '" value="' + esc(draftAmt(goal, sug)) + '">' ' + '' + '' +
+        '<div class="fld"><label>分钟（选填）' ' + '' + ' + '<input class="fld-min num" type="number" inputmode="numeric" min="0" step="1" data-f="min" data-id="' + esc(goal.id) + '" placeholder="—" value="' + esc(draftMin(goal)) + '">' ' + '' + '' +
+        '<div class="fld"><label>记到哪天' ' + '' + ' + '<select data-f="date" data-id="' + esc(goal.id) + '">' + dateOptionsHTML(goal) ' + '' ' + '' + '' +
+        '<button class="btn btn-primary btn-sm go" data-act="checkin" data-id="' + esc(goal.id) + '" type="button">' + ic('check', 15) + '打卡' ' + '' + '' +
+        (draftOf(goal) ? '<div class="gr-log" style="color:var(--amber);font-weight:700">' + ic('warn', 15) + ' 上次没写成功，已帮你把内容留在这，可以直接再点一次打卡' ' + '' + '' : '') ' + '' +
+        '<div class="gr-log">' +
+          (ta > 0 ? '<span style="color:var(--green);font-weight:700">今天已记 ' + nfmt(ta) + ' ' + esc(goal.unit || '') ' + '' : '<span>今天还没记录，可多次打卡' ' + '' + '') +
+          '<span>·' ' + '' + ' + '<span>建议量 = 剩余 ' + nfmt(remainOf(goal)) + ' ÷ 剩余 ' + Math.max(1, daysLeftOf(goal) + 1) + ' 天' ' + '' + '' ' + '') ' + '';
+}
+
+function renderToday() {
+  var t = todayStr();
+  var dEl = document.getElementById('attn-date');
+  if (dEl) dEl.textContent = mdCN(t) + ' 周' + dayCN(t);
+
+  var attns = '', n = 0;
+  sortedGoals().forEach(function (g) {
+    var cards = attnCardsOf(g);
+    if (cards.length) { n++; cards.forEach(function (h) { attns += h; }); }
+  });
+  var al = document.getElementById('attn-list');
+  if (al) {
+    al.innerHTML = attns ||
+      '<div class="empty-ok">' + ic('check', 18) + ' 昨天都跟上了，今天也没有逾期或漏打的目标' ' + '' + '';
+  }
+  var attnCard = document.getElementById('attn-card');
+  if (attnCard) attnCard.style.display = (n > 0) ? '' : 'none';
+
+  var list = document.getElementById('today-list');
+  if (list) {
+    list.innerHTML = S.goals.length ? sortedGoals().map(goalRowHTML).join('')
+      : '<div class="card" style="text-align:center;padding:34px 18px">' +
+        '<div style="font-size:32px;color:#c7cad8;margin-bottom:8px">' + ic('target', 34, 1.6) ' + '' +
+        '<div style="font-weight:800;margin-bottom:4px">还没有目标' ' + '' + '' +
+        '<div class="muted">先加一个「有终点、有总量」的目标，比如背完 2000 个单词、读完 440 页的书。' ' + '' + '' ' + '' + '';
+  }
+  var sumEl = document.getElementById('today-sum');
+  if (sumEl) {
+    var pending = 0, overdue = 0;
+    S.goals.forEach(function (g) { if (!isDone(g)) { pending++; if (overdueDays(g) > 0) overdue++; } });
+    sumEl.textContent = S.goals.length ? (pending + ' 个进行中' + (overdue ? (' · ' + overdue + ' 个逾期') : '')) : '';
+  }
+  var badge = document.getElementById('badge-today');
+  if (badge) {
+    var cnt = 0; S.goals.forEach(function (g) { var s = yesterdayState(g); if (s === 'rest' || s === 'broken' || overdueDays(g) > 0) cnt++; });
+    badge.textContent = cnt > 0 ? String(cnt) : '';
+    badge.className = 'nav-badge' + (cnt > 0 ? '' : ' hide');
+  }
+  renderHero();
+}
+
+function renderHero() {
+  var chip = document.getElementById('hero-chips'); if (!chip) return;
+  var doing = 0, doneN = 0, streakMax = 0;
+  S.goals.forEach(function (g) { if (isDone(g)) doneN++; else doing++; streakMax = Math.max(streakMax, computeStreak(g)); });
+  chip.innerHTML =
+    '<span class="chip">' + ic('target', 14) + '进行中 <b>' + doing ' + '' ' + '' + '' +
+    '<span class="chip">' + ic('check', 14) + '已达成 <b>' + doneN ' + '' ' + '' + '' +
+    '<span class="chip">' + ic('bolt', 14) + '最长连续 <b>' + streakMax + '' ' + '' + ' 天' ' + '' + '';
+}
+
+/* =======================================================================
+   9. 渲染层：看板
+   ======================================================================= */
+function ringSVG(pct, color) {
+  var r = 38, c = 2 * Math.PI * r, off = c * (1 - clamp(pct, 0, 100) / 100);
+  return '<svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">' +
+    '<circle cx="46" cy="46" r="' + r + '" fill="none" stroke="#eef0f7" stroke-width="9"/>' +
+    '<circle cx="46" cy="46" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="9" stroke-linecap="round" ' +
+    'stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '" transform="rotate(-90 46 46)"/>' ' + '' + '';
+}
+
+function boardCardHTML(goal) {
+  var pct = pctOf(goal), et = etaText(goal), st = computeStreak(goal), done = isDone(goal);
+  var recs = logsOf(goal.id).slice(0, 10);
+  var recHTML = recs.length ? recs.map(function (l) {
+    return '<div class="log-item">' +
+      '<span class="d">' + mdShort(l.date) + ' 周' + dayCN(l.date) ' + '' +
+      '<span class="a" style="color:' + esc(goal.color || COLORS[0]) + '">+' + nfmt(l.amount) + ' ' + esc(goal.unit || '') ' + '' +
+      (l.minutes ? '<span class="m">' + nfmt(l.minutes) + ' 分钟' ' + '' + '' : '<span class="m" style="color:#c7cad8">未填分钟' ' + '' + '') +
+      (l.makeup ? '<span class="mk">补' ' + '' + '' : '') +
+      '<span class="sp">' ' + '' + '' +
+      '<button class="del" data-act="dellog" data-id="' + esc(l.id) + '" type="button" aria-label="删除这条记录">' + ic('trash', 15) ' + '' ' + '' + '';
+  }).join('') : '<div class="tiny" style="padding:8px 0">还没有记录，去「今日」打第一次卡。' ' + '' + '';
+
+  return '<div class="card" style="margin-bottom:12px">' +
+    '<div class="card-title"><span class="dot" style="background:' + esc(goal.color || COLORS[0]) + '">' ' + '' + '' + esc(goal.name) +
+      (goal.seed ? '<span class="tag-seed">示例' ' + '' + '' : '') +
+      '<span class="sp">' ' + '' + ' + '<span class="tiny">' + nfmt(goalDone(goal)) + ' / ' + nfmt(goal.total) + ' ' + esc(goal.unit || '') ' + '' ' + '' + '' +
+    '<div class="ring-wrap">' + ringSVG(pct, goal.color || COLORS[0]) +
+      '<div class="board-stats">' +
+        '<div class="bs"><div class="k">完成率' ' + '' + ' + '<div class="v">' + pct.toFixed(0) + '%' ' + '' + '' ' + '' + '' +
+        '<div class="bs"><div class="k">连续打卡' ' + '' + ' + '<div class="v">' + st + ' 天' ' + '' + '' ' + '' + '' +
+        '<div class="bs"><div class="k">预计完成日' ' + '' + ' + '<div class="v ' + et.cls + '">' + esc(et.v) ' + '' +
+          (et.sub ? '<div class="k" style="margin-top:2px">' + esc(et.sub) ' + '' : '') ' + '' ' + '' ' + '' + '' +
+    ((goal.blocker || goal.counter) ? '<div class="gr-plan"><span class="k">最容易拦住我的：' ' + '' + '' + esc(goal.blocker || '未填写') +
+      '<br><span class="k">如果它出现，我就：' ' + '' + '' + esc(goal.counter || '未填写') ' + '' : '') +
+    '<div class="log-list" data-sp-bindable="database" data-sp-database-id="EWKqAtHl8V6s9UaAHpYd69">' +
+      '<div class="tiny" style="font-weight:700;margin-bottom:2px">最近 10 条记录' ' + '' + '' + recHTML ' + '' +
+    (done ? '' : '<div style="margin-top:10px"><button class="btn btn-ghost btn-sm" data-act="edit" data-id="' + esc(goal.id) + '" type="button">' + ic('edit', 15) + '编辑目标' ' + '' + '' ' + '' + '') ' + '';
+}
+
+function chartHTML() {
+  var t = todayStr(), days = [], i, j;
+  for (i = 13; i >= 0; i--) days.push(addDays(t, -i));
+  var used = {}, totals = [], maxV = 0, skipped = 0;
+  var data = {};
+  days.forEach(function (d) { data[d] = {}; });
+  S.logs.forEach(function (l) {
+    if (data[l.date] == null) return;
+    if (l.minutes == null || !(Number(l.minutes) > 0)) { skipped++; return; }
+    if (!data[l.date][l.goalId]) { data[l.date][l.goalId] = 0; used[l.goalId] = true; }
+    data[l.date][l.goalId] += Number(l.minutes);
+  });
+  days.forEach(function (d) {
+    var s = 0; for (var k in data[d]) s += data[d][k];
+    totals.push(s); if (s > maxV) maxV = s;
+  });
+  var goalList = S.goals.filter(function (g) { return used[g.id]; });
+  var W = 460, H = 200, mL = 38, mR = 8, mT = 10, mB = 30;
+  var pw = W - mL - mR, ph = H - mT - mB;
+  var step = pw / days.length, bw = Math.min(22, step * 0.6);
+  var nice = maxV <= 0 ? 30 : (Math.ceil(maxV / 30) * 30 || 30);
+  var out = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="min-width:400px;height:auto" role="img" aria-label="近 14 天投入分钟堆叠柱状图">';
+  for (i = 0; i <= 3; i++) {
+    var v = nice / 3 * i, y = mT + ph - (v / nice) * ph;
+    out += '<line x1="' + mL + '" y1="' + y.toFixed(1) + '" x2="' + (W - mR) + '" y2="' + y.toFixed(1) + '" stroke="#eef0f7" stroke-width="1"/>';
+    out += '<text x="' + (mL - 6) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="9" fill="#8b93a7">' + Math.round(v) ' + '';
+  }
+  days.forEach(function (d, idx) {
+    var x = mL + step * idx + (step - bw) / 2, acc = 0;
+    if (totals[idx] > 0) {
+      goalList.forEach(function (g) {
+        var v = data[d][g.id] || 0; if (!(v > 0)) return;
+        var h = (v / nice) * ph, y = mT + ph - acc / nice * ph - h;
+        out += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" fill="' + esc(g.color || COLORS[0]) + '" opacity=".92"><title>' + esc(g.name) + ' ' + mdShort(d) + '：' + v + ' 分钟' + ''</rect>';
+        acc += v;
+      });
+      out += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (mT + ph - acc / nice * ph - 4).toFixed(1) + '" text-anchor="middle" font-size="8.5" fill="#5a6378">' + acc ' + '';
+    } else {
+      out += '<rect x="' + x.toFixed(1) + '" y="' + (mT + ph - 3) + '" width="' + bw.toFixed(1) + '" height="3" fill="#eef0f7" rx="1.5"><title>' + mdShort(d) + '：无记录' + ''</rect>';
+    }
+    var isToday = d === t;
+    out += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (mT + ph + 14) + '" text-anchor="middle" font-size="9" fill="' + (isToday ? '#4f46e5' : '#8b93a7') + '" font-weight="' + (isToday ? '700' : '400') + '">' + mdShort(d) ' + '';
+    out += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (mT + ph + 25) + '" text-anchor="middle" font-size="8" fill="' + (isToday ? '#4f46e5' : '#c7cad8') + '">' + dayCN(d) ' + '';
+  });
+  out += '<line x1="' + mL + '" y1="' + (mT + ph) + '" x2="' + (W - mR) + '" y2="' + (mT + ph) + '" stroke="#e8eaf2" stroke-width="1"/>' ' + '' + '';
+  return { svg: out, goalList: goalList, skipped: skipped, maxV: maxV, totals: totals, days: days };
+}
+
+function renderBoard() {
+  var box = document.getElementById('board-list');
+  if (box) {
+    box.innerHTML = S.goals.length ? sortedGoals().map(boardCardHTML).join('')
+      : '<div class="card" style="text-align:center;padding:34px 18px"><div style="font-weight:800;margin-bottom:4px">看板还是空的' ' + '' + ' + '<div class="muted">先在「今日」建一个目标。' ' + '' + '' ' + '' + '';
+  }
+  var chart = document.getElementById('chart');
+  if (chart) {
+    var r = chartHTML();
+    chart.innerHTML = r.svg;
+    var lg = document.getElementById('chart-legend');
+    if (lg) lg.innerHTML = r.goalList.length ? r.goalList.map(function (g) { return '<span><i style="background:' + esc(g.color || COLORS[0]) + '">' ' + '' + '' + esc(g.name) ' + ''; }).join('') : '<span class="muted">暂无分钟数据' ' + '' + '';
+    var tip = document.getElementById('chart-tip');
+    if (tip) {
+      var withMin = 0; S.logs.forEach(function (l) { if (l.date >= r.days[0] && l.minutes != null) withMin++; });
+      tip.innerHTML = '只统计填了分钟数的记录' + (r.skipped > 0 ? ('，近 14 天有 <b>' + r.skipped + '' ' + '' + ' 条未填分钟数，不硬凑进图表') : '') +
+        '；近 14 天共 ' + withMin + ' 条计时记录。';
+    }
+  }
+}

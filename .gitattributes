@@ -1,0 +1,12 @@
+# 统一换行符为 LF：单文件产物需要「逐字节可复现」，
+# 若不同平台签出成 CRLF，merge.py 的字节比对会失准。
+* text=auto eol=lf
+
+# 二进制文件不做换行符转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

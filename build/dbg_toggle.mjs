@@ -1,0 +1,33 @@
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+const require = createRequire('C:/Users/111/.workbuddy/binaries/node/workspace/');
+const { JSDOM } = require('jsdom');
+const html = fs.readFileSync(new URL('../学习目标管理台.html', import.meta.url), 'utf8');
+const T=new Date(); const p=n=>(n<10?'0'+n:''+n); const ds=d=>d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+const add=(s,n)=>{const[y,m,d]=s.split('-').map(Number);const dd=new Date(y,m-1,d);dd.setDate(dd.getDate()+n);return ds(dd);};
+const TODAY=ds(T), back=n=>add(TODAY,-n);
+const goals=[{名称:'背英语单词',单位:'个',总量:2000,截止日:add(TODAY,45),配色:'#6366f1',障碍:'x',对策:'y',是否示例:true,排序:1}];
+const logs=[[8,40,30],[7,45,32],[2,45,30]].map(([d,a,m],i)=>({record_id:'l'+i,目标ID:'g0',目标名:'背英语单词',日期:back(d),打卡量:a,分钟数:m,补记:false}));
+const store={goals:goals.map((r,i)=>({record_id:'g'+i,...r})),logs,reviews:[]};
+console.log('store.logs:',store.logs.length);
+const db={query:({databaseId})=>Promise.resolve({results:databaseId==='BIidtdjTZqaX8pBamGfpwG'?store.goals:(databaseId==='EWKqAtHl8V6s9UaAHpYd69'?store.logs:store.reviews),hasMore:false,nextCursor:null}),
+ addRecord:()=>Promise.resolve({id:'n'}),updateRecord:()=>Promise.resolve({}),deleteRecord:()=>Promise.resolve({})};
+const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://example.com/',beforeParse(w){
+ Object.defineProperty(w,'__SMART_PAGE__',{configurable:true,get:()=>({database:db})});
+ w.scrollTo=()=>{}; if(!w.Element.prototype.scrollIntoView) w.Element.prototype.scrollIntoView=function(){};
+ w.addEventListener('error',e=>console.log('ERR',e.error&&e.error.stack||e.message));
+}});
+const {window}=dom, doc=window.document;
+await new Promise(r=>setTimeout(r,400));
+const row=doc.querySelector('#today-list .goal');
+console.log('row found:', !!row, 'id=', row&&row.id);
+const t=row.querySelector('[data-act="toggle"]');
+console.log('toggle btn:', !!t);
+t.dispatchEvent(new window.MouseEvent('click',{bubbles:true,cancelable:true}));
+await new Promise(r=>setTimeout(r,200));
+console.log('after click, inputs in row:', row.querySelectorAll('input,select').length);
+console.log('row still in doc:', doc.contains(row));
+const row2=doc.querySelector('#today-list .goal');
+console.log('new row inputs:', row2.querySelectorAll('input,select').length);
+console.log('checkin panel present:', !!doc.querySelector('.checkin'));
+dom.window.close();

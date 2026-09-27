@@ -1,0 +1,434 @@
+
+/* =======================================================================
+   10. 渲染层：周报
+   ======================================================================= */
+function weekRange(mon) { return { s: mon, e: addDays(mon, 6) }; }
+function weekStats(mon) {
+  var r = weekRange(mon), res = { mon: mon, s: r.s, e: r.e, per: {}, days: 0, minutes: 0, count: 0 };
+  var dset = {};
+  S.logs.forEach(function (l) {
+    if (l.date < r.s || l.date > r.e) return;
+    if (!res.per[l.goalId]) res.per[l.goalId] = 0;
+    res.per[l.goalId] += (Number(l.amount) || 0);
+    res.minutes += (Number(l.minutes) || 0);
+    dset[l.date] = 1;
+  });
+  res.days = Object.keys(dset).length;
+  S.goals.forEach(function (g) { if (res.per[g.id] == null) res.per[g.id] = 0; });
+  return res;
+}
+function cmpText(cur, prev, unit) {
+  var d = Math.round((cur - prev) * 10) / 10;
+  if (Math.abs(d) < 0.05) return '<span class="cmp flat">环比持平' ' + '' + '';
+  return '<span class="cmp ' + (d > 0 ? 'up' : 'down') + '">环比 ' + (d > 0 ? '+' : '') + nfmt(d) + ' ' + esc(unit || '') ' + '';
+}
+
+function renderWeek() {
+  var mon = VIEW.week, t = todayStr();
+  var cur = weekStats(mon), prev = weekStats(addDays(mon, -7));
+  var lb = document.getElementById('wk-label');
+  if (lb) {
+    var isCur = mon === mondayOf(t);
+    lb.textContent = mdShort(mon) + '–' + mdShort(cur.e) + (isCur ? '（本周）' : '');
+    lb.style.color = isCur ? 'var(--brand)' : 'var(--ink)';
+  }
+  var nx = document.getElementById('wk-next');
+  if (nx) nx.style.opacity = (mon >= mondayOf(t)) ? '.35' : '1';
+
+  var sum = document.getElementById('wk-sum');
+  if (sum) {
+    var totalAmt = 0;
+    S.goals.forEach(function (g) { totalAmt += (cur.per[g.id] || 0); });
+    var totalAmtP = 0;
+    S.goals.forEach(function (g) { totalAmtP += (prev.per[g.id] || 0); });
+    sum.innerHTML =
+      '<div class="wk-cell"><div class="k">投入量合计' ' + '' + ' + '<div class="v">' + nfmt(totalAmt) ' + '' +
+        (cmpText(totalAmt, totalAmtP, '') ) ' + '' +
+      '<div class="wk-cell"><div class="k">打卡天数' ' + '' + ' + '<div class="v">' + cur.days + ' 天' ' + '' + '' + cmpText(cur.days, prev.days, '天') ' + '' +
+      '<div class="wk-cell"><div class="k">投入分钟' ' + '' + ' + '<div class="v">' + cur.minutes ' + '' + cmpText(cur.minutes, prev.minutes, '分') ' + '';
+  }
+  var gl = document.getElementById('wk-goals');
+  if (gl) {
+    if (!S.goals.length) gl.innerHTML = '<div class="tiny">还没有目标。' ' + '' + '';
+    else {
+      gl.innerHTML = S.goals.map(function (g) {
+        var a = cur.per[g.id] || 0, p = prev.per[g.id] || 0, dd = Math.round((a - p) * 10) / 10;
+        return '<div class="wk-goal"><i style="width:9px;height:9px;border-radius:3px;background:' + esc(g.color || COLORS[0]) + ';display:inline-block;flex:none">' ' + '' + '' +
+          '<span class="nm">' + esc(g.name) ' + '' +
+          '<span class="vv" style="color:' + esc(g.color || COLORS[0]) + '">' + nfmt(a) + ' ' + esc(g.unit || '') ' + '' +
+          '<span class="tiny" style="min-width:66px;text-align:right">' + (dd === 0 ? '持平' : (dd > 0 ? '+' : '') + nfmt(dd)) ' + '' ' + '' + '';
+      }).join('') + '<div class="tiny" style="margin-top:6px">分目标数值为区间内累计完成量（含补记）。' ' + '' + '';
+    }
+  }
+  var rv = null;
+  for (var i = 0; i < S.reviews.length; i++) { if (S.reviews[i].week === mon) { rv = S.reviews[i]; break; } }
+  var fields = [['keep', 'keep'], ['issue', 'issue'], ['tryIt', 'tryIt'], ['plan', 'plan']];
+  fields.forEach(function (f) {
+    var ta = document.querySelector('[data-rv="' + f[0] + '"]');
+    if (!ta) return;
+    if (document.activeElement === ta) return;   /* 正在输入时不打断 */
+    var v = rv ? (rv[f[1]] || '') : '';
+    if (ta.value !== v) ta.value = v;
+  });
+}
+
+function cmpWord(cur, prev, unit) {
+  var d = Math.round((cur - prev) * 10) / 10;
+  if (Math.abs(d) < 0.05) return '环比持平';
+  return '环比 ' + (d > 0 ? '+' : '') + nfmt(d) + (unit || '');
+}
+
+function buildReport() {
+  var mon = VIEW.week, cur = weekStats(mon), prev = weekStats(addDays(mon, -7));
+  var rv = null;
+  for (var i = 0; i < S.reviews.length; i++) { if (S.reviews[i].week === mon) { rv = S.reviews[i]; break; } }
+  var L = [];
+  L.push('学习周报 ' + mon + ' ~ ' + cur.e);
+  L.push('');
+  L.push('一、本周投入（均含上周同期环比）');
+  if (!S.goals.length) L.push('· 暂无目标');
+  S.goals.forEach(function (g) {
+    var a = cur.per[g.id] || 0, p = prev.per[g.id] || 0;
+    L.push('· ' + g.name + '：' + nfmt(a) + ' ' + (g.unit || '') + '（上周 ' + nfmt(p) + '，' + cmpWord(a, p, '') + '）');
+  });
+  var ta = 0, tp = 0;
+  S.goals.forEach(function (g) { ta += (cur.per[g.id] || 0); tp += (prev.per[g.id] || 0); });
+  L.push('· 合计：投入量 ' + nfmt(ta) + '（' + cmpWord(ta, tp, '') + '）' +
+    '，打卡 ' + cur.days + ' 天（上周 ' + prev.days + ' 天，' + cmpWord(cur.days, prev.days, ' 天') + '）' +
+    '，投入 ' + cur.minutes + ' 分钟（上周 ' + prev.minutes + ' 分钟，' + cmpWord(cur.minutes, prev.minutes, ' 分') + '）');
+  L.push('');
+  L.push('二、复盘');
+  L.push('保持：' + ((rv && rv.keep) || '（未填写）'));
+  L.push('问题：' + ((rv && rv.issue) || '（未填写）'));
+  L.push('尝试：' + ((rv && rv.tryIt) || '（未填写）'));
+  L.push('下周预案：' + ((rv && rv.plan) || '（未填写）'));
+  L.push('');
+  L.push('三、目标进度');
+  S.goals.forEach(function (g) {
+    var e = etaText(g);
+    L.push('· ' + g.name + '：' + pctOf(g).toFixed(0) + '%（' + nfmt(goalDone(g)) + '/' + nfmt(g.total) + ' ' + (g.unit || '') + '），截止 ' + g.due + '，预计完成日 ' + e.v + (e.sub ? '（' + e.sub + '）' : ''));
+  });
+  return L.join('\n');
+}
+
+/* =======================================================================
+   11. 渲染层：我的
+   ======================================================================= */
+function renderMine() {
+  var box = document.getElementById('sync-detail');
+  if (!box) return;
+  var label = { loading: '读取中', ok: '在线同步正常', offline: '离线模式（本机缓存）', error: '读取线上数据失败' };
+  var color = { loading: 'var(--amber)', ok: 'var(--green)', offline: 'var(--amber)', error: 'var(--red)' };
+  var seedN = 0; S.goals.forEach(function (g) { if (g.seed) seedN++; });
+  box.innerHTML =
+    '<div class="kv"><span class="k">当前状态' ' + '' + ' + '<span class="v" style="color:' + color[SYNC.status] + '">' + label[SYNC.status] ' + '' ' + '' + '' +
+    '<div class="kv"><span class="k">最近一次同步' ' + '' + ' + '<span class="v">' + (SYNC.last ? SYNC.last : '—') ' + '' ' + '' + '' +
+    '<div class="kv"><span class="k">线上数据表' ' + '' + ' + '<span class="v">学习目标 / 每日打卡记录 / 每周复盘' ' + '' + '' ' + '' + '' +
+    '<div class="kv"><span class="k">目标 · 打卡记录 · 周复盘' ' + '' + ' + '<span class="v">' + S.goals.length + ' · ' + S.logs.length + ' · ' + S.reviews.length ' + '' ' + '' + '' +
+    '<div class="kv"><span class="k">其中示例数据' ' + '' + ' + '<span class="v">' + seedN + ' 个目标' ' + '' + '' ' + '' + '';
+}
+
+/* =======================================================================
+   12. 统一刷新入口（唯一调度点，渲染函数之间互不调用）
+   ======================================================================= */
+function refreshAll() {
+  renderSync();
+  renderToday();
+  renderBoard();
+  renderWeek();
+  renderMine();
+}
+
+/* =======================================================================
+   13. 交互动作
+   ======================================================================= */
+function nowTime() {
+  var d = new Date(), p = function (n) { return n < 10 ? '0' + n : '' + n; };
+  return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+function switchTab(name) {
+  VIEW.tab = name;
+  var btns = document.querySelectorAll('.nav-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].className = 'nav-btn' + (btns[i].getAttribute('data-tab') === name ? ' active' : '');
+  var panels = document.querySelectorAll('.tab-panel');
+  for (var j = 0; j < panels.length; j++) panels[j].className = 'tab-panel' + (panels[j].id === 'tab-' + name ? ' active' : '');
+  window.scrollTo(0, 0);
+}
+
+function goalFormHTML(g) {
+  g = g || { name: '', unit: '', total: '', due: addDays(todayStr(), 30), color: COLORS[0], blocker: '', counter: '' };
+  var sw = COLORS.map(function (c) {
+    return '<button type="button" class="swatch' + (c === g.color ? ' on' : '') + '" data-f="color" data-c="' + c + '" style="background:' + c + '" aria-label="配色">' ' + '' + '';
+  }).join('');
+  return '<h3>' + (g.id ? '编辑目标' : '新建学习目标') ' + '' +
+    '<div class="sub">适合有终点、有总量的目标，例如「背完 2000 个单词」「读完 440 页」。' ' + '' + '' +
+    '<div class="form-grid">' +
+      '<div class="fld"><label>目标名称' ' + '' + ' + '<input id="g-name" type="text" value="' + esc(g.name) + '" placeholder="例：背完考研核心词">' ' + '' + '' +
+      '<div class="form-grid two">' +
+        '<div class="fld"><label>总量' ' + '' + ' + '<input id="g-total" type="number" inputmode="decimal" min="1" step="any" value="' + esc(g.total) + '" placeholder="2000">' ' + '' + '' +
+        '<div class="fld"><label>单位' ' + '' + ' + '<input id="g-unit" type="text" value="' + esc(g.unit) + '" placeholder="个 / 页 / 节">' ' + '' + '' ' + '' +
+      '<div class="fld"><label>截止日' ' + '' + ' + '<input id="g-due" type="date" value="' + esc(g.due) + '">' ' + '' + '' +
+      '<div class="fld"><label>配色' ' + '' + ' + '<div class="swatches" id="g-colors">' + sw ' + '' ' + '' + '' +
+      '<div class="fld"><label>最容易拦住我的障碍（选填）' ' + '' + ' + '<textarea id="g-blocker" placeholder="例：晚上一躺下就开始刷手机">' + esc(g.blocker) ' + '' ' + '' + '' +
+      '<div class="fld"><label>如果它出现，我就……（选填）' ' + '' + ' + '<textarea id="g-counter" placeholder="例：把手机放到客厅，先背 20 个再拿回来">' + esc(g.counter) ' + '' ' + '' + '' ' + '' +
+    '<div class="modal-acts"><button class="btn btn-ghost" data-close type="button">取消' ' + '' + '' +
+    '<button class="btn btn-primary" id="g-save" type="button">' + (g.id ? '保存修改' : '创建目标') ' + '' ' + '' + '';
+}
+
+function openGoalForm(goal) {
+  openModal(goalFormHTML(goal));
+  var swBox = document.getElementById('g-colors');
+  swBox.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-f="color"]') : null;
+    if (!b) return;
+    var all = swBox.querySelectorAll('.swatch');
+    for (var i = 0; i < all.length; i++) all[i].className = 'swatch';
+    b.className = 'swatch on';
+  });
+  document.getElementById('g-save').addEventListener('click', function () {
+    var name = (document.getElementById('g-name').value || '').trim();
+    var unit = (document.getElementById('g-unit').value || '').trim();
+    var total = Math.max(0, parseFloat(document.getElementById('g-total').value) || 0);
+    var due = (document.getElementById('g-due').value || '').slice(0, 10);
+    var on = swBox.querySelector('.swatch.on');
+    var color = on ? on.getAttribute('data-c') : COLORS[0];
+    if (!name) { toast('给目标起个名字', 'err'); return; }
+    if (!(total > 0)) { toast('总量要大于 0', 'err'); return; }
+    if (!due) { toast('选一个截止日', 'err'); return; }
+    var patch = {
+      name: name, unit: unit || '次', total: total, due: due, color: color,
+      blocker: (document.getElementById('g-blocker').value || '').trim(),
+      counter: (document.getElementById('g-counter').value || '').trim()
+    };
+    if (goal) { for (var k in patch) goal[k] = patch[k]; }
+    closeModal();
+    var btn = this; btn.disabled = true;
+    (goal ? actUpdateGoal(goal) : actAddGoal(patch)).then(function () {
+      refreshAll(); toast(goal ? '已保存修改' : '目标已创建，数据已写回线上', 'ok');
+    }).catch(function () { toast('写入线上失败，请重试', 'err'); }).then(function () { btn.disabled = false; });
+  });
+}
+
+function doCheckin(goalId) {
+  var goal = goalById(goalId); if (!goal) return;
+  var row = document.getElementById('row-' + goalId);
+  if (!row) return;
+  var amtEl = row.querySelector('[data-f="amt"]'), minEl = row.querySelector('[data-f="min"]'), dateEl = row.querySelector('[data-f="date"]');
+  var amt = parseFloat(amtEl && amtEl.value);
+  if (!(amt > 0)) { toast('完成量要大于 0', 'err'); if (amtEl) amtEl.focus(); return; }
+  var mins = (minEl && String(minEl.value).trim() !== '') ? Math.max(0, parseInt(minEl.value, 10) || 0) : null;
+  var date = (dateEl && dateEl.value) || todayStr();
+  var wasDone = isDone(goal);
+  var log = { id: uid(), goalId: goal.id, goalName: goal.name, date: date, amount: amt, minutes: mins, makeup: date !== todayStr() };
+  var btn = row.querySelector('[data-act="checkin"]'); if (btn) btn.disabled = true;
+  /* 先落草稿：万一线上写失败，这些内容还在本机，回来时自动填回 */
+  var dk = 'checkin_' + goal.id;
+  saveDraft(dk, { amt: amtEl ? amtEl.value : '', min: minEl ? minEl.value : '', date: date });
+  actAddLog(log).then(function () {
+    clearDraft(dk);
+    if (!wasDone && isDone(goal)) confetti();
+    refreshAll();
+    toast('已记录 +' + nfmt(amt) + ' ' + (goal.unit || '') + (log.makeup ? '（补记 ' + mdShort(date) + '）' : ''), 'ok');
+  }).catch(function () { toast('写入线上失败，内容已留在本地草稿，请重试', 'err'); })
+    .then(function () { if (btn) btn.disabled = false; refreshAll(); });
+}
+
+function doDeleteGoal(goalId) {
+  var goal = goalById(goalId); if (!goal) return;
+  var n = logsOf(goalId).length;
+  confirmModal({
+    title: '删除目标「' + goal.name + '」？',
+    warn: '删除后，这个目标下的 ' + n + ' 条打卡记录会一起删除，线上数据同步清除，无法恢复。',
+    desc: '如果只是想改目标值，用「编辑」更合适。',
+    okText: '确认删除', danger: true,
+    onOk: function () {
+      var btn = document.getElementById('btn-clear-all');
+      actDeleteGoal(goalId).then(function () { refreshAll(); toast('目标已删除', 'ok'); })
+        .catch(function () { toast('删除线上数据失败，请重试', 'err'); });
+    }
+  });
+}
+
+function doDeleteLog(logId, btn) {
+  var l = null; for (var i = 0; i < S.logs.length; i++) { if (S.logs[i].id === logId) { l = S.logs[i]; break; } }
+  if (!l) return;
+  actDeleteLog(logId).then(function () { refreshAll(); toast('已删除这条记录', 'ok'); })
+    .catch(function () { toast('删除线上记录失败，请重试', 'err'); });
+}
+
+function doClearSeed() {
+  var ids = S.goals.filter(function (g) { return g.seed; }).map(function (g) { return g.id; });
+  if (!ids.length) { toast('已经没有示例数据了'); return; }
+  confirmModal({
+    title: '清空示例数据？',
+    warn: '将删除 ' + ids.length + ' 个带「示例」标记的目标及其打卡记录，你自己创建的目标不受影响。',
+    okText: '清空示例', danger: true,
+    onOk: function () {
+      var chain = Promise.resolve();
+      ids.forEach(function (id) { chain = chain.then(function () { return actDeleteGoal(id); }); });
+      chain.then(function () { refreshAll(); toast('示例数据已清空', 'ok'); }).catch(function () { toast('清理失败，请重试', 'err'); });
+    }
+  });
+}
+
+function doClearAll() {
+  confirmModal({
+    title: '清空全部数据？',
+    warn: '将删除全部目标、打卡记录和周复盘，线上数据表也会被清空，无法恢复。',
+    input: true, inputLabel: '请输入「清空」两个字确认', inputPlaceholder: '清空',
+    okText: '确认清空', danger: true,
+    onOk: function () {
+      var chain = Promise.resolve();
+      S.logs.slice().forEach(function (l) { chain = chain.then(function () { return actDeleteLog(l.id); }); });
+      S.goals.slice().forEach(function (g) { chain = chain.then(function () { return actDeleteGoal(g.id); }); });
+      S.reviews.slice().forEach(function (r) { chain = chain.then(function () { return actDeleteReview(r.id); }); });
+      chain.then(function () { refreshAll(); toast('全部数据已清空', 'ok'); }).catch(function () { toast('清空未完成，请重试', 'err'); refreshAll(); });
+    }
+  });
+}
+
+function doPull(manual) {
+  SYNC.status = 'loading'; renderSync();
+  pullAll().then(function () {
+    SYNC.status = 'ok'; SYNC.last = nowTime();
+  }).catch(function (e) {
+    var hasSdk = !!DB();
+    loadCache();
+    SYNC.status = hasSdk ? 'error' : 'offline';
+    SYNC.last = localStorage.getItem(CACHE_DTS) ? ('缓存于 ' + String(localStorage.getItem(CACHE_DTS)).slice(11, 19)) : '';
+    if (manual) toast(hasSdk ? '读取线上数据失败，当前为本机缓存' : '未检测到线上数据通道，已用本机缓存', 'err');
+  }).then(function () {
+    refreshAll();
+  });
+}
+
+var rvTimer = null;
+function saveReviewField(field) {
+  var mon = VIEW.week;
+  var rv = null;
+  for (var i = 0; i < S.reviews.length; i++) { if (S.reviews[i].week === mon) { rv = S.reviews[i]; break; } }
+  if (!rv) { rv = { id: uid(), week: mon, keep: '', issue: '', tryIt: '', plan: '' }; }
+  var ta = document.querySelector('[data-rv="' + field + '"]');
+  rv[field] = ta ? ta.value : '';
+  actSaveReview(rv).then(function () {
+    S.reviews = S.reviews.filter(function (x) { return x.week !== mon; });
+    if (rv.__rid || rv.id) S.reviews.push(rv);
+    var ind = document.getElementById('rv-save'); if (ind) ind.textContent = '已保存 ' + nowTime().slice(0, 5);
+    saveCache();
+  }).catch(function () { toast('周复盘保存失败，请重试', 'err'); });
+}
+
+/* =======================================================================
+   14. 事件绑定
+   ======================================================================= */
+function bindStatic() {
+  var navs = document.querySelectorAll('.nav-btn');
+  for (var i = 0; i < navs.length; i++) {
+    navs[i].addEventListener('click', function () { switchTab(this.getAttribute('data-tab')); });
+  }
+  var nb = document.getElementById('btn-new-top'), nb2 = document.getElementById('btn-new-bottom');
+  if (nb) nb.addEventListener('click', function () { openGoalForm(null); });
+  if (nb2) nb2.addEventListener('click', function () { openGoalForm(null); });
+  var wp = document.getElementById('wk-prev'), wn = document.getElementById('wk-next');
+  if (wp) wp.addEventListener('click', function () { VIEW.week = addDays(VIEW.week, -7); refreshAll(); });
+  if (wn) wn.addEventListener('click', function () {
+    if (VIEW.week >= mondayOf(todayStr())) { toast('已经是本周了'); return; }
+    VIEW.week = addDays(VIEW.week, 7); refreshAll();
+  });
+  var gr = document.getElementById('btn-gen-report');
+  if (gr) gr.addEventListener('click', function () {
+    document.getElementById('report-out').value = buildReport();
+    toast('周报已生成，可直接复制', 'ok');
+  });
+  var bc = document.getElementById('btn-copy-report');
+  if (bc) bc.addEventListener('click', function () {
+    var ta = document.getElementById('report-out');
+    if (!ta.value.trim()) { toast('先点「生成周报」', 'err'); return; }
+    ta.select(); ta.setSelectionRange(0, 999999);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    if (!ok && navigator.clipboard) { navigator.clipboard.writeText(ta.value); ok = true; }
+    toast(ok ? '已复制到剪贴板' : '复制失败，请手动选中复制', ok ? 'ok' : 'err');
+  });
+  var rs = document.getElementById('btn-resync');
+  if (rs) rs.addEventListener('click', function () { doPull(true); });
+  var cs = document.getElementById('btn-clear-seed');
+  if (cs) cs.addEventListener('click', doClearSeed);
+  var ca = document.getElementById('btn-clear-all');
+  if (ca) ca.addEventListener('click', doClearAll);
+
+  document.addEventListener('input', function (e) {
+    var el = e.target;
+    if (!el || !el.getAttribute) return;
+    var f = el.getAttribute('data-rv');
+    if (f) {
+      clearTimeout(rvTimer);
+      rvTimer = setTimeout(function () { saveReviewField(f); }, 700);
+    }
+  }, false);
+}
+
+function bindDelegates() {
+  document.addEventListener('click', function (e) {
+    var el = e.target;
+    var btn = el && el.closest ? el.closest('[data-act]') : null;
+    if (!btn) return;
+    var act = btn.getAttribute('data-act'), id = btn.getAttribute('data-id');
+    if (act === 'resync') { doPull(true); return; }
+    if (act === 'edit') { openGoalForm(goalById(id)); return; }
+    if (act === 'del') { doDeleteGoal(id); return; }
+    if (act === 'dellog') {
+      /* 二次确认：第一次点亮「再点一次删除」，第二次才真的删 */
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.className = 'del confirm';
+        btn.innerHTML = '再点一次删除';
+        setTimeout(function () {
+          btn.className = 'del'; btn.innerHTML = ic('trash', 15); btn.removeAttribute('data-armed');
+        }, 3200);
+      } else {
+        doDeleteLog(id, btn);
+      }
+      return;
+    }
+    if (act === 'focus') {
+      switchTab('today');
+      setTimeout(function () {
+        var row = document.getElementById('row-' + id);
+        if (!row) return;
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        var inp = row.querySelector('[data-f="amt"]');
+        if (inp) { try { inp.focus(); inp.select(); } catch (err) {} }
+      }, 120);
+      return;
+    }
+    if (act === 'checkin') { doCheckin(id); return; }
+  }, false);
+}
+
+/* =======================================================================
+   15. 启动：先出界面，再拉线上数据
+   ======================================================================= */
+function boot() {
+  bindStatic();
+  bindDelegates();
+  /* 先用缓存（或空态）把界面渲染出来，绝不白屏 */
+  loadCache();
+  SYNC.status = 'loading';
+  refreshAll();
+  doPull(false);
+  /* 跨天/跨零点时自动对齐今天 */
+  setInterval(function () {
+    if (VIEW.__day && VIEW.__day !== todayStr()) { VIEW.__day = todayStr(); VIEW.week = mondayOf(todayStr()); refreshAll(); }
+    VIEW.__day = todayStr();
+  }, 60000);
+  VIEW.__day = todayStr();
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+
+})();
+</script>
+</body>
+</html>

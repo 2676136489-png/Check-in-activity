@@ -1,0 +1,185 @@
+<body>
+<div class="app">
+
+  <nav class="nav" id="nav" aria-label="主导航">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.4 9.2 8 10 4.6-.8 8-5 8-10V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></svg></div>
+      <div><div class="bt">学习目标</div><div class="bs">有终点 · 有总量</div></div>
+    </div>
+
+    <button class="nav-btn active" data-tab="today" type="button" aria-label="今日">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M8 2.5v4M16 2.5v4M3 10h18"/><path d="M9 15l2 2 4-4"/></svg>
+      <span class="lbl">今日</span><span class="nav-badge hide" id="badge-today">0</span>
+    </button>
+    <button class="nav-btn" data-tab="board" type="button" aria-label="看板">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><rect x="5" y="11" width="3.4" height="8" rx="1"/><rect x="10.3" y="6" width="3.4" height="13" rx="1"/><rect x="15.6" y="14" width="3.4" height="5" rx="1"/></svg>
+      <span class="lbl">看板</span>
+    </button>
+    <button class="nav-btn" data-tab="week" type="button" aria-label="周报">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M3 9.5h18M9 9.5V20"/><path d="M14 13h4M14 16.5h3"/></svg>
+      <span class="lbl">周报</span>
+    </button>
+    <button class="nav-btn" data-tab="mine" type="button" aria-label="我的">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.3-3.7 4-5.6 7.5-5.6s6.2 1.9 7.5 5.6"/></svg>
+      <span class="lbl">我的</span>
+    </button>
+  </nav>
+
+  <main class="main">
+   <div class="main-inner">
+
+    <!-- 页头：说明这是什么、现在什么状态 -->
+    <header class="page-head">
+      <div class="ph-top"><span class="ph-date" id="ph-date"></span><span class="ph-kicker">学习目标管理台</span></div>
+      <h1 class="ph-h1" id="ph-title">今天，把大目标往前推一点</h1>
+      <p class="ph-sub" id="ph-sub">管理「有终点、有总量」的目标：填上总量和截止日，系统替你算每天做多少，你只负责打卡。</p>
+      <div class="ph-stats" id="ph-stats" data-sp-bindable="database" data-sp-database-id="BIidtdjTZqaX8pBamGfpwG"></div>
+    </header>
+
+    <!-- 同步状态 -->
+    <div id="sync-zone"></div>
+
+    <!-- ============ Tab 1 今日 ============ -->
+    <section class="panel active" id="tab-today">
+      <div id="attn-zone" data-sp-bindable="database" data-sp-database-id="EWKqAtHl8V6s9UaAHpYd69"></div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <h2>我的目标</h2><span class="sp"></span>
+          <span class="meta" id="today-sum" data-sp-bindable="database" data-sp-database-id="BIidtdjTZqaX8pBamGfpwG"></span>
+          <button class="btn btn-soft btn-sm" id="btn-new-top" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>新建目标</button>
+        </div>
+        <p class="sec-note">点<b>「打卡」</b>记下今天的完成量即可，其余数字会自动累计。建议量 = 剩余量 ÷ 剩余天数，随着进度每天更新。</p>
+        <div id="today-list" data-sp-bindable="database" data-sp-database-id="BIidtdjTZqaX8pBamGfpwG"></div>
+      </div>
+    </section>
+
+    <!-- ============ Tab 2 看板 ============ -->
+    <section class="panel" id="tab-board">
+      <div class="sec">
+        <div class="sec-head"><h2>目标进度</h2><span class="sp"></span><span class="meta">按推进顺序排列</span></div>
+        <p class="sec-note">进度环 = 已完成 ÷ 总量；<b>预计完成日</b>按最近 7 天的平均速度推算，样本不足 3 天时不显示，不编数字。</p>
+        <div id="board-list" class="board-grid" data-sp-bindable="database" data-sp-database-id="BIidtdjTZqaX8pBamGfpwG"></div>
+      </div>
+      <div class="sec">
+        <div class="card" id="chart-card">
+          <div class="card-head"><h3>近 14 天投入</h3><span class="sp"></span><span class="meta">按目标堆叠 · 单位：分钟</span></div>
+          <div class="chart-wrap" id="chart" data-sp-bindable="database" data-sp-database-id="EWKqAtHl8V6s9UaAHpYd69"></div>
+          <div class="legend" id="chart-legend" data-sp-bindable="database" data-sp-database-id="BIidtdjTZqaX8pBamGfpwG"></div>
+          <div class="chart-tip" id="chart-tip"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Tab 3 周报 ============ -->
+    <section class="panel" id="tab-week">
+      <div class="sec">
+        <div class="card">
+          <div class="card-head"><h3>本周汇总</h3><span class="sp"></span>
+            <div class="week-nav">
+              <button class="icon-btn" id="wk-prev" type="button" aria-label="上一周"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+              <span class="ttl" id="wk-label"></span>
+              <button class="icon-btn" id="wk-next" type="button" aria-label="下一周"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+            </div>
+          </div>
+          <div class="wk-nums" id="wk-sum" data-sp-bindable="database" data-sp-database-id="EWKqAtHl8V6s9UaAHpYd69"></div>
+          <div class="wk-goals" id="wk-goals" data-sp-bindable="database" data-sp-database-id="EWKqAtHl8V6s9UaAHpYd69"></div>
+          <div class="tiny" style="margin-top:10px">口径：周一至周日全天，环比对象是上一周同一口径。</div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="card">
+          <div class="card-head"><h3>四问复盘</h3><span class="sp"></span><span class="rv-save" id="rv-save"></span></div>
+          <p class="sec-note" style="margin:0 0 12px">每周花两分钟回答这四件事，比单纯记流水更能看清节奏。写完自动保存。</p>
+          <div class="four">
+            <div class="fld"><label for="rv-keep">保持 · 哪件事做对了</label><textarea id="rv-keep" data-rv="keep" data-sp-bindable="database" data-sp-database-id="bMjplT6TsrTmhwH8BxZKIE" placeholder="例：早上通勤背单词，效率最高"></textarea></div>
+            <div class="fld"><label for="rv-issue">问题 · 什么挡住了你</label><textarea id="rv-issue" data-rv="issue" data-sp-bindable="database" data-sp-database-id="bMjplT6TsrTmhwH8BxZKIE" placeholder="例：晚上加班回来只剩刷手机"></textarea></div>
+            <div class="fld"><label for="rv-tryIt">尝试 · 下周想换的做法</label><textarea id="rv-tryIt" data-rv="tryIt" data-sp-bindable="database" data-sp-database-id="bMjplT6TsrTmhwH8BxZKIE" placeholder="例：午休先背 20 个，晚上不安排"></textarea></div>
+            <div class="fld"><label for="rv-plan">预案 · 如果它出现，我就……</label><textarea id="rv-plan" data-rv="plan" data-sp-bindable="database" data-sp-database-id="bMjplT6TsrTmhwH8BxZKIE" placeholder="例：21 点还没开始，就把手机放客厅，只做 10 个"></textarea></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="card">
+          <div class="card-head"><h3>一键生成周报</h3></div>
+          <div class="muted" style="margin-bottom:12px">汇总本周投入、环比与四问复盘，生成一段可直接转发的文本。</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <button class="btn btn-primary btn-sm" id="btn-gen-report" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>生成周报</button>
+            <button class="btn btn-ghost btn-sm" id="btn-copy-report" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>复制文本</button>
+          </div>
+          <textarea class="report-out" id="report-out" aria-label="周报文本" placeholder="点「生成周报」后，文本会出现在这里"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Tab 4 我的 ============ -->
+    <section class="panel" id="tab-mine">
+      <div class="sec">
+        <div class="card">
+          <div class="card-head"><h3>同步状态</h3></div>
+          <div id="sync-detail" data-sp-bindable="database" data-sp-database-id="BIidtdjTZqaX8pBamGfpwG"></div>
+          <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" id="btn-resync" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 4v7h-7"/></svg>重新同步</button>
+          </div>
+          <div class="tiny" style="margin-top:10px">数据存在资料库云端，换设备或换浏览器打开会自动拉取同一份数据。最近的操作记录：</div>
+          <div id="sync-log" style="margin-top:6px"></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="card">
+          <div class="card-head"><h3>数据管理</h3></div>
+          <div class="mine-list">
+            <button class="list-btn" id="btn-export" type="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>
+              <span class="sp">导出为 JSON 备份<span class="sm" style="display:block;font-weight:600">把三张表的数据存成一个文件，随时可再导入</span></span></button>
+            <button class="list-btn" id="btn-import" type="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 19h14"/></svg>
+              <span class="sp">从 JSON 备份导入<span class="sm" style="display:block;font-weight:600">选择之前导出的文件，追加到现有数据</span></span></button>
+            <button class="list-btn" id="btn-clear-seed" type="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/></svg>
+              <span class="sp">清空示例数据<span class="sm" style="display:block;font-weight:600">只删带「示例」标记的目标与记录</span></span></button>
+            <button class="list-btn danger" id="btn-clear-all" type="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 3 20h18z"/><path d="M12 9v5M12 17h.01"/></svg>
+              <span class="sp">清空全部数据<span class="sm" style="display:block;font-weight:600">需手动输入「清空」确认</span></span></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="card">
+          <div class="card-head"><h3>添加到手机主屏幕</h3></div>
+          <div class="steps">
+            <div class="step"><span class="no">1</span><span>用手机浏览器打开本页（Safari 或 Chrome 都可以）。</span></div>
+            <div class="step"><span class="no">2</span><span>点底部或右上角的「分享」/「菜单」按钮。</span></div>
+            <div class="step"><span class="no">3</span><span>选择「添加到主屏幕」，确认名称即可——之后像 App 一样打开。</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="card">
+          <div class="card-head"><h3>这个工作台怎么用</h3></div>
+          <div class="tiny">
+            <b style="color:var(--ink-2)">适合什么：</b>有终点、有总量的目标，比如「背完 2000 个单词」「读完 440 页书」。<br>
+            <b style="color:var(--ink-2)">不适合什么：</b>没有终点的习惯（比如「每天喝水」）——那种更适合习惯打卡类工具。<br>
+            <b style="color:var(--ink-2)">连续天数规则：</b>每周自动给 1 个休息日，本周第一次漏打卡不算中断，第二次才从头计。<br>
+            <b style="color:var(--ink-2)">数据在哪：</b>资料库的三张表——学习目标 / 每日打卡记录 / 每周复盘，可随时导出为 JSON 备份。
+          </div>
+        </div>
+      </div>
+    </section>
+
+   </div>
+  </main>
+</div>
+
+<div id="modal-root"></div>
+<div id="confetti"></div>
+<input type="file" id="import-file" accept=".json,application/json" class="sr" aria-hidden="true" tabindex="-1">
