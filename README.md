@@ -5,11 +5,15 @@
 ![tests](https://img.shields.io/badge/tests-51%20passed-2c6b5c.svg)
 ![lint](https://img.shields.io/badge/lint-eslint%209-3a6b8c.svg)
 
+### 👉 [在线演示 · 点开即用（免登录，无需安装）](https://study-goal-console-39820.app.workbuddy.host/)
+
 > 一个「以打卡驱动目标推进」的个人工作台：设定目标 → 每日打卡 → **按近 7 天真实均速推算还剩几天** → 每周四格复盘。
 
 市面上的习惯打卡 App 回答的是「你连续坚持了几天」，这个工具回答的是**「按现在的速度，这本书还要几天读完」**——前者只能让我自我感觉良好，后者才能让我判断今晚要不要多花一小时。整个项目的算法、状态模型和交互都是围绕这一个问题设计的。
 
-仓库里有两套功能对齐、定位不同的实现：**单文件 HTML（零依赖、双击即开）** 与 **React + TypeScript 工程化版（分层架构、可替换数据源）**。
+仓库里有两套功能对齐、定位不同的实现：**单文件 HTML（零依赖、双击即开）** 与 **React + TypeScript 工程化版（分层架构、可替换数据源）**。上面的演示链接部署的是工程化版。
+
+> 打开后是一张白纸（数据默认存在浏览器本地，不是加载失败），点页面上的「**载入示例数据**」即可看到四组带 14 天记录的目标，覆盖推进中 / 可能延期 / 已逾期 / 已完成四种状态。
 
 ---
 
@@ -245,15 +249,19 @@ git diff --exit-code -- ../学习目标管理台.html   # 应无输出
 
 ## 部署
 
+**当前线上**：<https://study-goal-console-39820.app.workbuddy.host/>
+
 **工程化版**
 
 ```bash
 cd app && npm run build
 ```
 
-`dist/` 是纯静态产物，可直接丢到任意静态托管。已配置 `base: './'`，因此放在**子路径**下（如 GitHub Pages 的 `/Check-in-activity/`）也不会出现资源 404 白屏。
+`dist/` 是纯静态产物，可直接丢到任意静态托管。已配置 `base: './'`，因此放在**子路径**下也不会出现资源 404 白屏。
 
-Vercel：Framework 选 Vite，Build Command `npm run build`，Output Directory `dist`，Root Directory `app`。
+**GitHub Pages**：仓库里已经放好了 `.github/workflows/pages.yml`，推到 `main` 就会构建并发布 `app/dist`。需要在仓库 **Settings → Pages → Build and deployment → Source** 里选择 **GitHub Actions**（一次性设置），之后地址是 `https://2676136489-png.github.io/Check-in-activity/`。工作流里带了一条断言：产物不得出现 `src="/..."` 这种绝对路径引用，出现即失败——防止哪天误改 `base` 又变成白屏。
+
+**Vercel**：Framework 选 Vite，Build Command `npm run build`，Output Directory `dist`，Root Directory `app`。
 
 **单文件版**：把 `学习目标管理台.html` 放到任意静态托管即可。
 
@@ -268,6 +276,7 @@ Vercel：Framework 选 Vite，Build Command `npm run build`，Output Directory `
 - **`app/` 与单文件版不共享数据**。工程化版默认走 IndexedDB，想打通得补一个走 `__SMART_PAGE__.database` 的适配器。
 - **`check.js` → `final_script.js` 这一级上游构建是断的**（原因见 `项目介绍.md`）。要么把 `check.js` 更新到 v2 接回来，要么承认 `final_script.js` 就是源。
 - **`build/` 里堆了十余个排障脚本**，该归档到 `build/legacy/` 或清掉。
+- **GitHub Pages 的演示页还没生效**：工作流已经写好，但需要去仓库 Settings → Pages 把 Source 改成 GitHub Actions 才会跑。在那之前线上入口只有上面 WorkBuddy 那条链接。
 
 ---
 

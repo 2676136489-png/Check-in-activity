@@ -7,6 +7,8 @@ React 18 + TypeScript + Vite + Tailwind CSS 实现的学习目标追踪应用。
 [![CI](https://github.com/2676136489-png/Check-in-activity/actions/workflows/ci.yml/badge.svg)](https://github.com/2676136489-png/Check-in-activity/actions/workflows/ci.yml)
 ![tests](https://img.shields.io/badge/tests-51%20passed-2c6b5c.svg)
 
+**在线演示** → <https://study-goal-console-39820.app.workbuddy.host/>（免登录，打开后点「载入示例数据」）
+
 ## ✨ 核心特性
 
 - **ETA 预测**：基于近 7 天回溯均速 + 每周休息日规则，推算目标完成天数
