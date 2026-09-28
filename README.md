@@ -57,8 +57,8 @@
 | 视图 | React 18 · TypeScript 5 · Tailwind CSS | 严格模式 TS，无 `any` 逃逸 |
 | 构建 | Vite 5 | `base: './'`，可部署到任意子路径 |
 | 静态检查 | ESLint 9（flat config）· typescript-eslint | 含 `react-hooks/rules-of-hooks`，拦过真实事故 |
-| 测试 | Vitest 2 | 领域层纯函数单测，51 个用例 / 4 个文件 |
-| 渲染验证 | react-dom/server + Vite `ssrLoadModule` | 25 项断言，确认页面真的渲染得出来 |
+| 测试 | Vitest 2 | 领域层纯函数单测，80 个用例 / 5 个文件 |
+| 渲染验证 | react-dom/server + Vite `ssrLoadModule` | 26 项断言，确认页面真的渲染得出来 |
 | CI | GitHub Actions | 4 个 job：lint·类型·单测·冒烟·构建 / 产物字节复现 / 页面交互冒烟 / 敏感信息扫描 |
 | 存储 | Repository 模式 | IndexedDB（默认，零配置）/ Supabase，适配器可换 |
 | 图表 | 手写 SVG | 环形进度与 14 天堆叠柱状图均自行绘制 |
@@ -79,7 +79,7 @@
 │            Domain（无副作用、可单测）             │
 │   types/  ·  lib/date.ts  ·  lib/eta.ts        │
 │           ·  lib/chart.ts  ·  lib/sample.ts    │
-│      ← 51 个单测全部落在这一层                    │
+│      ← 80 个单测全部落在这一层                    │
 └───────────────────┬────────────────────────────┘
                     │  Repository 接口
 ┌───────────────────▼────────────────────────────┐
@@ -139,7 +139,7 @@ ESLint 9 flat config，开着 `react-hooks/rules-of-hooks`。这条规则不是�
 
 `App.tsx` 里 `if (!repo) return <初始化中/>` 原本写在三个 `useState` **前面**。首屏 `repo` 还是 null，这一轮只跑 3 个 Hook；等 `createRepo()` 解析完，同一轮多跑了 3 个，React 抛 #310（*Rendered more hooks than during the previous render*），**整个应用白屏**。而 `tsc` 和 `vite build` 全程绿灯。这条规则直接指出：「Did you accidentally call a React Hook after an early return?」
 
-### 单元测试 · `npm test` → **51 个用例 / 4 个文件全绿**
+### 单元测试 · `npm test` → **80 个用例 / 5 个文件全绿**
 
 覆盖的是容易错、且错了不容易发现的地方：
 
@@ -156,7 +156,7 @@ ESLint 9 flat config，开着 `react-hooks/rules-of-hooks`。这条规则不是�
 >
 > 二是 `build/shots.mjs` / `shots_data.mjs` 用 `new URL(import.meta.url).pathname` 取脚本目录，而它对中文路径返回 percent-encoded 形式，Windows 会把它当成一个**真实存在的目录名**。后果极其隐蔽：读页面走 `file://` URL（Chrome 会解码 → 加载正确文件），写截图走那个未解码的路径（→ 全部落进一个幽灵目录）。于是「截图看着有内容，其实是几小时前的旧图」，页面改了也完全看不出来。改用 `fileURLToPath` 修好。
 
-### 渲染冒烟 · `npm run smoke` → **25 项断言**
+### 渲染冒烟 · `npm run smoke` → **26 项断言**
 
 `tsc` 和 `vite build` 都不跑渲染，所以上面那个白屏事故它们一无所知。这个脚本用 `react-dom/server` 把 App 和四个页签、空态、页头各渲染一次，断言内容正确：四态标签齐不齐、图表柱子是不是真的按目标分色（而不只是图例分色）、已完成的目标有没有误报逾期。
 
@@ -192,10 +192,10 @@ node build/shots.mjs        # Playwright 六档尺寸实拍 + 横向溢出元素
 ```
 .
 ├── 学习目标管理台.html          # 单文件运行版（构建产物，2338 行 / 零外链零依赖）
-├── app/                        # 工程化版（React 18 + TS + Vite，26 个源文件 ≈ 1830 行）
+├── app/                        # 工程化版（React 18 + TS + Vite，27 个源文件 ≈ 2160 行）
 │   ├── src/
 │   │   ├── types/              # 领域类型
-│   │   ├── lib/                # 纯函数 + 单测（date / eta / chart / sample / palette）
+│   │   ├── lib/                # 纯函数 + 单测（date / eta / chart / sample / migrate / palette）
 │   │   ├── repo/               # Repository 接口 + IndexedDB / Supabase 适配器
 │   │   ├── hooks/              # useStore（状态集中）
 │   │   └── components/         # UI（含 EmptyState 空态引导）
@@ -203,6 +203,7 @@ node build/shots.mjs        # Playwright 六档尺寸实拍 + 横向溢出元素
 │   ├── public/favicon.svg      # 与设计系统同源的进度环图标
 │   ├── eslint.config.js
 │   └── vitest.config.ts        # fileParallelism: false（原因见注释）
+├── 启动本地版.cmd               # Windows 一键：装依赖 → 起本地服务 → 开浏览器
 ├── build/                      # 单文件版的构建与验证工具链
 │   ├── p1.html  p2.html        #   源片段：CSS / 骨架
 │   ├── final_script.js         #   源片段：逻辑
@@ -221,22 +222,33 @@ node build/shots.mjs        # Playwright 六档尺寸实拍 + 横向溢出元素
 
 ## 快速开始
 
-**工程化版**
+**工程化版（想自己日常用，走这条）**
+
+Windows 上双击仓库根目录的 `启动本地版.cmd`：第一次会自动 `npm install`，然后在 <http://localhost:5173/> 起本地服务，浏览器由 Vite 自己打开（`vite --open` 等端口真的监听了才开，不用猜延迟）。关掉那个窗口就是停止。
+
+命令行等价写法：
 
 ```bash
 cd app
 npm install
-npm run dev          # http://localhost:5173
+npm run dev          # http://localhost:5173（想自动开浏览器：npm run dev -- --open）
 npm run lint         # ESLint
-npm test             # 51 个单测
-npm run smoke        # 25 项渲染冒烟
+npm test             # 80 个单测
+npm run smoke        # 26 项渲染冒烟
 npm run typecheck    # 仅类型检查
 npm run build        # 产物在 app/dist/
+npm run preview      # 预览构建产物：http://localhost:4173
 ```
 
-首次打开是空态——数据默认存在浏览器本地，所以是一张白纸，不是加载失败。页面上点「**载入示例数据**」即可看到四组带 14 天记录的目标（同时覆盖推进中 / 可能延期 / 已逾期 / 已完成四种状态），随时可在「我的」里一键清除。
+**数据存在浏览器本地**（IndexedDB，零配置、离线可用），按「浏览器 + 源」隔离。所以要注意两件事：`localhost:5173` 和 `127.0.0.1:5173` 是两个不同的源、各存一份数据，建议固定用 `localhost` 那个；换浏览器、清站点数据、或改用 `preview` 的 4173 端口，看到的都是另一份数据（甚至空库）。要挪窝就先去「我的」导出 JSON。
 
-**单文件版**：直接用浏览器打开 `学习目标管理台.html` 即可。它通过云端数据表读写数据，离线打开会走降级路径——UI 正常渲染、空态有提示，**不会白屏**。
+首次打开是空态——一张白纸，不是加载失败。三条出路：点「**载入示例数据**」看四组带 14 天记录的目标（推进中 / 可能延期 / 已逾期 / 已完成各一）、自己新建一个目标、或者去「我的」导入一份已有备份。
+
+**已经有数据要搬进来**：「我的 → 导入 JSON」同时认两种文件——工程化版自己导出的备份，和单文件版导出的备份（`{goals,logs,reviews}`，字段是 `blocker / counter / seed / sort`、`makeup`、`week` 那一套）。后者导入时自动做字段映射、补出缺失的 `id` / `createdAt` / 截止日，读不通的地方会明确告诉你跳过了几条、为什么，不静默丢数据。导入是**整体替换**（先清空再写入），文件里一个目标都没有时直接中止——避免出现「清空了却什么都没换回来」。
+
+**别双击 `app/dist/index.html`**：`file://` 协议下浏览器以 CORS 为由拒绝加载 ES module 和样式表，页面是一片空白（实测 `#root` 子节点数为 0，控制台两条 `net::ERR_FAILED`）。要看构建产物就用 `npm run preview`，或丢给任意静态服务。
+
+**单文件版**：`学习目标管理台.html` 的数据通道由宿主页面注入（`window.__SMART_PAGE__.database`），在资料库页面里打开才有读写能力。直接双击只能看到外壳——数据通道不可用时会走降级路径：UI 正常渲染、空态有提示、**不会白屏**，但新建的目标不会真的存下来（写入路径会以「离线」被拒）。
 
 **重新构建单文件版**
 
@@ -273,7 +285,7 @@ cd app && npm run build
 
 - **开发工具链有 5 条中低危依赖公告**（`vite` / `esbuild` / `@vitest/mocker`）。生产依赖 `npm audit --omit=dev` 为 **0 漏洞**；这些只影响本地开发服务器与测试环境，不影响构建产物与线上运行。修掉需要升 Vite 到 7+ / Vitest 到 5，属于破坏性升级，这次没动。
 - **测试只覆盖领域层**。组件层没有单测，靠 SSR 渲染冒烟 + 浏览器实测兜底。要往上做需要引 `@testing-library/react` + jsdom。
-- **`app/` 与单文件版不共享数据**。工程化版默认走 IndexedDB，想打通得补一个走 `__SMART_PAGE__.database` 的适配器。
+- **两个版本之间只有「导出 / 导入」这一条数据通路**，不是实时同步。要做到实时打通，得补一个走 `__SMART_PAGE__.database` 的适配器；而这个通道只在资料库宿主页面里存在，本地服务拿不到它，所以离线运行注定只能靠备份文件搬家。搬家这条路已经把字段映射做在 `lib/migrate.ts` 里，单文件版的备份可以直接导入。
 - **`check.js` → `final_script.js` 这一级上游构建是断的**（原因见 `项目介绍.md`）。要么把 `check.js` 更新到 v2 接回来，要么承认 `final_script.js` 就是源。
 - **`build/` 里堆了十余个排障脚本**，该归档到 `build/legacy/` 或清掉。
 - **GitHub Pages 的演示页还没生效**：工作流已经写好，但需要去仓库 Settings → Pages 把 Source 改成 GitHub Actions 才会跑。在那之前线上入口只有上面 WorkBuddy 那条链接。

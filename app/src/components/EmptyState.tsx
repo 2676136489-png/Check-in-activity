@@ -5,14 +5,18 @@
  * 所以任何人第一次打开都是一张白纸。如果只是显示「暂无数据」，
  * 页面看起来就像坏了一样 —— 而它其实是好的，只是还没有内容。
  *
- * 所以这里给两条明确的路：自己建一个目标，或者先载入示例数据看效果。
+ * 所以这里给三条明确的路：自己建一个目标、先载入示例数据看效果，
+ * 或者（如果手里有单文件版导出的备份）去「我的」导入。
+ * 最后那条以前是走不通的：空态原先在「我的」页签下也会渲染，
+ * 于是恰恰在「最想导入备份」的时候进不去导入入口。
  */
 interface Props {
   onLoadSample: () => void
   onAddGoal: () => void
+  onGoMine: () => void
 }
 
-export function EmptyState({ onLoadSample, onAddGoal }: Props) {
+export function EmptyState({ onLoadSample, onAddGoal, onGoMine }: Props) {
   return (
     <section className="px-5">
       <div className="card px-6 py-10 text-center">
@@ -36,7 +40,14 @@ export function EmptyState({ onLoadSample, onAddGoal }: Props) {
           </button>
         </div>
 
-        <p className="text-xs text-muted mt-5 leading-relaxed">
+        <p className="text-xs text-muted mt-4 leading-relaxed">
+          手里有备份（单文件版导出的 JSON 也可以）？
+          <button className="underline text-ink-600 ml-1" onClick={onGoMine}>
+            去「我的」导入
+          </button>
+        </p>
+
+        <p className="text-xs text-muted mt-4 leading-relaxed">
           示例数据是四组带 14 天打卡记录的目标，
           <br className="hidden sm:block" />
           能同时看到「推进中 / 可能延期 / 已逾期 / 已完成」四种状态。

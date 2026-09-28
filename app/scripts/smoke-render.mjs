@@ -126,7 +126,7 @@ try {
   const mineHtml = render(
     React.createElement(MineView, {
       onExport: async () => data,
-      onImport: async () => {},
+      onImportBackup: async () => ({ source: 'native', counts: { goals: 0, logs: 0, reviews: 0 }, warnings: [] }),
       onLoadSample: async () => {},
       onClearAll: async () => {},
       hasSample: true,
@@ -136,18 +136,22 @@ try {
   check('我的页渲染出数据管理', has(mineHtml, '数据管理'))
   check('我的页有导出 / 导入', has(mineHtml, '导出 JSON') && has(mineHtml, '导入 JSON'))
   check('我的页有重置示例 / 清除全部', has(mineHtml, '重置示例数据') && has(mineHtml, '清除全部数据'))
+  check('我的页说明了导入认单文件版备份', has(mineHtml, '单文件版'))
   check('我的页无示例时按钮文案切换为「载入示例数据」',
     has(render(React.createElement(MineView, {
-      onExport: async () => data, onImport: async () => {}, onLoadSample: async () => {},
+      onExport: async () => data,
+      onImportBackup: async () => ({ source: 'native', counts: { goals: 0, logs: 0, reviews: 0 }, warnings: [] }),
+      onLoadSample: async () => {},
       onClearAll: async () => {}, hasSample: false, repoKind: 'indexeddb',
     })), '载入示例数据'))
 
   // 3) 空态：第一次打开时看到的就是它，不能是「白屏 + 暂无数据」
   const emptyHtml = render(
-    React.createElement(EmptyState, { onLoadSample: () => {}, onAddGoal: () => {} }),
+    React.createElement(EmptyState, { onLoadSample: () => {}, onAddGoal: () => {}, onGoMine: () => {} }),
   )
   check('空态渲染出标题', has(emptyHtml, '这里还没有目标'))
-  check('空态给出两条出路', has(emptyHtml, '载入示例数据') && has(emptyHtml, '新建一个目标'))
+  check('空态给出三条出路',
+    has(emptyHtml, '载入示例数据') && has(emptyHtml, '新建一个目标') && has(emptyHtml, '去「我的」导入'))
   check('空态说明了「不是加载失败」', has(emptyHtml, '不是加载失败'))
 
   // 4) 页头芯片与统计口径

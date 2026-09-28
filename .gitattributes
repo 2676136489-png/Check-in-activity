@@ -2,6 +2,11 @@
 # 若不同平台签出成 CRLF，merge.py 的字节比对会失准。
 * text=auto eol=lf
 
+# Windows 批处理例外，必须是 CRLF：
+# cmd.exe 在 LF-only 的 .cmd 上处理 goto / 标签是不可靠的。
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
 # 二进制文件不做换行符转换
 *.png binary
 *.jpg binary

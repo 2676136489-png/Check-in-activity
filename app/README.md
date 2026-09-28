@@ -54,7 +54,7 @@ React 18 + TypeScript + Vite + Tailwind CSS 实现的学习目标追踪应用。
 ## ✅ 测试
 
 ```bash
-npm test          # 一次性运行：4 个文件 / 51 个用例
+npm test          # 一次性运行：5 个文件 / 80 个用例
 npm run test:watch
 ```
 
@@ -64,8 +64,9 @@ npm run test:watch
 | `src/lib/sample.test.ts` | 16 | 示例数据对同一个 `today` 输出恒定；所有日期落在 14 天窗口内；每条打卡的 `goalId` 都能找到目标；**四种状态恰好各覆盖一次**；换 `today` 时日期整体平移、条数不变 |
 | `src/lib/chart.test.ts` | 11 | 堆叠 offset 连续；总量等于各段之和；某目标当天没数据时后续段 offset 不被凭空抬高；同一目标同一天多条记录先求和；没填用时的记录不参与也不按 0 计入；窗口外记录被丢弃 |
 | `src/lib/date.test.ts` | 10 | `isoDate` 补零；`daysBetween` 可正可负、跨月跨年；`offsetDays` 闰年（`2028-02-28 → 02-29 → 03-01`）；`mondayOf` 周日归本周一；`recentDays` 含基准当天、从旧到新、跨月连续 |
+| `src/lib/migrate.test.ts` | 29 | 单文件版备份的字段映射（`blocker→obstacle`、`counter→countermeasure`、`seed→isSeed`、`sort→order`、`makeup→backfilled`、`week→weekStart`、`issue→problem`、`tryIt→try`、`plan→nextWeekPlan`）；缺 `id`/`createdAt`/截止日的兜底；数字以字符串形式出现时仍能读成数字；`goalId` 失配时退回按名称匹配；重名目标与同周复盘的处理；**备份里没有目标必须抛错**（否则等于先清空再写入）；工程化版备份往返逐字段不变 |
 
-> **为什么关闭了文件级并行**：Vitest 默认并行跑测试文件。在某些沙箱环境里，worker 写模块缓存会被系统拦截（`EPERM: operation not permitted`），结果是**第二个测试文件被静默跳过、run 却依然报绿**——只跑了一个文件还说通过，是最危险的假阳性。`vitest.config.ts` 里设了 `test.fileParallelism: false`，并把原因写在注释里。51 个用例总耗时不到 4 秒，串行的代价可以忽略。
+> **为什么关闭了文件级并行**：Vitest 默认并行跑测试文件。在某些沙箱环境里，worker 写模块缓存会被系统拦截（`EPERM: operation not permitted`），结果是**第二个测试文件被静默跳过、run 却依然报绿**——只跑了一个文件还说通过，是最危险的假阳性。`vitest.config.ts` 里设了 `test.fileParallelism: false`，并把原因写在注释里。80 个用例总耗时不到 3 秒，串行的代价可以忽略。
 
 ## 🔍 Lint
 
@@ -83,7 +84,7 @@ npm run smoke
 
 `tsc` 和 `vite build` 都不跑渲染，构建通过不代表页面能渲染。这个脚本用 `react-dom/server` 把组件真正渲染成 HTML 再断言内容（Vite 项目的 `.tsx` 不能被 node 直接 import，所以走 `vite.ssrLoadModule`）。
 
-覆盖 25 项断言：App 整体不抛错、四个页签各自的标题与数据、四态标签齐全、**图表柱子是否真的按目标分色**（而不只是图例分色）、空态的两条出路、页头统计口径。
+覆盖 26 项断言：App 整体不抛错、四个页签各自的标题与数据、四态标签齐全、**图表柱子是否真的按目标分色**（而不只是图例分色）、空态的三条出路（含导入入口）、页头统计口径。
 
 **已知边界**：SSR 不执行 `useEffect`，所以只能验证首屏渲染与内容，**点击、切换、IndexedDB 落盘测不到**，这部分直接在浏览器里跑 `npm run preview` 确认。
 
@@ -124,6 +125,8 @@ app/
 │   │   ├── chart.test.ts     #   └ 11 个用例
 │   │   ├── sample.ts         # 示例数据生成（纯函数，日期相对 today）
 │   │   ├── sample.test.ts    #   └ 16 个用例
+│   │   ├── migrate.ts        # 备份迁移：单文件版导出 → 本工程导入格式（纯函数）
+│   │   ├── migrate.test.ts   #   └ 29 个用例
 │   │   └── palette.ts        # 低饱和配色板
 │   ├── repo/
 │   │   ├── types.ts          # Repository 接口
@@ -136,7 +139,7 @@ app/
 │   ├── main.tsx
 │   └── index.css             # Tailwind + 学术纸感设计令牌
 ├── scripts/
-│   ├── smoke-render.mjs      # SSR 渲染冒烟（25 项断言）
+│   ├── smoke-render.mjs      # SSR 渲染冒烟（26 项断言）
 │   └── shots.mjs             # 生成 ../docs/ 里的 README 实拍图
 ├── public/favicon.svg        # 与设计系统同源的进度环图标
 ├── index.html
@@ -151,21 +154,29 @@ app/
 
 ## 🚀 快速开始
 
+Windows 上双击仓库根目录的 `启动本地版.cmd` 即可（首次自动装依赖，然后起服务并开浏览器）。命令行等价写法：
+
 ```bash
 cd app
 npm install
 npm run dev          # 启动开发服务器 http://localhost:5173
 npm run lint         # ESLint
-npm test             # 运行单元测试（4 文件 / 51 用例）
-npm run smoke        # SSR 渲染冒烟（25 项）
+npm test             # 运行单元测试（5 文件 / 80 用例）
+npm run smoke        # SSR 渲染冒烟（26 项）
 npm run typecheck    # 仅类型检查
 npm run build        # 生产构建，产物在 dist/
-npm run preview      # 预览构建产物
+npm run preview      # 预览构建产物（http://localhost:4173）
 ```
+
+**数据存在哪**：默认 IndexedDB，按「浏览器 + 源」隔离。`localhost:5173` 与 `127.0.0.1:5173` 是两个不同的源、各存一份数据，`npm run dev` 和 `npm run preview` 也各存一份——建议固定用 `localhost:5173`，要换设备就先去「我的」导出 JSON。
 
 首次打开是空态——数据默认存在浏览器本地，所以是一张白纸，这不是加载失败。
 在空态页点「载入示例数据」即可看到四组带 14 天记录的目标，覆盖四种状态；
-在「我的」页可以重置示例数据或清除全部数据。
+在「我的」页可以重置示例数据或清除全部数据。空态页底部的「去『我的』导入」通到同一页。
+
+**导入已有备份**：「我的 → 导入 JSON」。它同时认本工程导出的备份和单文件版导出的备份——后者字段名不同（`blocker` / `counter` / `seed` / `sort` / `makeup` / `week`）且没有 `id`，导入时由 `src/lib/migrate.ts` 做映射并补主键。导入是整体替换，会先确认一次；文件里没有目标时直接中止，不会把现有数据清空。
+
+**不要用 `file://` 打开 `dist/index.html`**：浏览器会以 CORS 为由拒绝加载 ES module 与样式表，页面空白。看构建产物请用 `npm run preview`。
 
 ## ☁️ 启用 Supabase 云端存储
 

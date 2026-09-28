@@ -1,9 +1,10 @@
 import { useRef } from 'react'
 import type { Goal, Log, Review } from '@/types'
+import { describeImport, type ImportSummary } from '@/lib/migrate'
 
 interface Props {
   onExport: () => Promise<{ goals: Goal[]; logs: Log[]; reviews: Review[] }>
-  onImport: (data: { goals: Goal[]; logs: Log[]; reviews: Review[] }) => Promise<void>
+  onImportBackup: (text: string) => Promise<ImportSummary>
   onLoadSample: () => Promise<void>
   onClearAll: () => Promise<void>
   hasSample: boolean
@@ -11,7 +12,7 @@ interface Props {
 }
 
 /** 我的页：数据备份还原 + 说明 */
-export function MineView({ onExport, onImport, onLoadSample, onClearAll, hasSample, repoKind }: Props) {
+export function MineView({ onExport, onImportBackup, onLoadSample, onClearAll, hasSample, repoKind }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleExport = async () => {
@@ -28,15 +29,15 @@ export function MineView({ onExport, onImport, onLoadSample, onClearAll, hasSamp
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    e.target.value = ''
+    if (!confirm('导入会先清空当前数据，再用文件里的内容替换（不是追加）。确定继续？')) return
     const text = await file.text()
     try {
-      const data = JSON.parse(text)
-      await onImport(data)
-      alert('导入成功')
-    } catch {
-      alert('文件格式错误')
+      const summary = await onImportBackup(text)
+      alert(describeImport(summary))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '导入失败')
     }
-    e.target.value = ''
   }
 
   const handleLoadSample = async () => {
@@ -71,6 +72,11 @@ export function MineView({ onExport, onImport, onLoadSample, onClearAll, hasSamp
             onChange={handleImport}
           />
         </div>
+        <p className="text-xs text-muted">
+          导出的是工程化版备份（含 id，可直接再导入）。导入同时认单文件版导出的备份——字段名会自动
+          转换，缺的字段按默认值补齐，读不通的地方会告诉你跳过了几条、为什么。导入是整体替换，
+          不是追加。
+        </p>
 
         <div className="flex flex-wrap gap-2 pt-3 border-t border-hairline">
           <button className="btn-ghost hairline" onClick={handleLoadSample}>

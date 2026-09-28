@@ -5,6 +5,7 @@ import type { Repository } from '@/repo/types'
 import type { TabKey } from '@/types'
 import { isoDate } from '@/lib/date'
 import { buildSampleData } from '@/lib/sample'
+import { normalizeBackup, type ImportSummary } from '@/lib/migrate'
 import { PageHead } from '@/components/PageHead'
 import { NavTabs } from '@/components/NavTabs'
 import { TodayTable } from '@/components/TodayTable'
@@ -31,8 +32,10 @@ export default function App() {
      首屏 repo 还是 null，这一轮只跑了 3 个 Hook；等 createRepo() 解析完 repo 到位，
      同一轮多跑了 3 个 Hook，React 直接抛 #310（Rendered more hooks than during
      the previous render），整个应用白屏。
-     麻烦的是 tsc 和 vite build 全程都是绿的 —— 只有真的在浏览器里打开才会发现。
-     （app/src/App.test.tsx 现在会把这个渲染出来，跑测试就能拦住。） */
+     麻烦的是 tsc 和 vite build 全程都是绿的，SSR 渲染冒烟也只渲染一次、同样抓不到。
+     真正拦住它的是 ESLint 的 react-hooks/rules-of-hooks（npm run lint），
+     报错为「React Hook "useState" is called conditionally」。
+     组件层没有单测（测试只覆盖领域层），所以这条 lint 规则别关。 */
   if (!repo) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-muted">
@@ -61,6 +64,22 @@ export default function App() {
   /** 清空全部数据（含示例与用户自己录的） */
   const clearAll = () => store.importAll({ goals: [], logs: [], reviews: [] })
 
+  /**
+   * 导入备份：单文件版的导出文件（字段名不一样、没有 id）也走这里，
+   * 由 normalizeBackup 认字段、补主键，读不通就抛带中文说明的错。
+   */
+  const importBackup = async (text: string): Promise<ImportSummary> => {
+    let raw: unknown
+    try {
+      raw = JSON.parse(text)
+    } catch {
+      throw new Error('这个文件不是合法的 JSON，可能选错了文件')
+    }
+    const { bundle, source, counts, warnings } = normalizeBackup(raw)
+    await store.importAll(bundle)
+    return { source, counts, warnings }
+  }
+
   const isEmpty = !store.loading && !store.error && store.goals.length === 0
 
   return (
@@ -73,8 +92,24 @@ export default function App() {
           <p className="text-center text-sm text-muted py-10">加载中…</p>
         ) : store.error ? (
           <p className="text-center text-sm text-[#a2382c] py-10">{store.error}</p>
+        ) : tab === 'mine' ? (
+          /* 「我的」不参与空态判断：第一次打开、库里一条数据都没有的时候，
+             恰恰是最需要它的时候（导入备份、清除数据都在这一页）。
+             原先空态会盖掉所有页签，导致这个入口在最该出现的时候进不去。 */
+          <MineView
+            onExport={store.exportAll}
+            onImportBackup={importBackup}
+            onLoadSample={loadSample}
+            onClearAll={clearAll}
+            hasSample={store.goals.some((g) => g.isSeed)}
+            repoKind={repo.kind}
+          />
         ) : isEmpty ? (
-          <EmptyState onLoadSample={loadSample} onAddGoal={() => setAddOpen(true)} />
+          <EmptyState
+            onLoadSample={loadSample}
+            onAddGoal={() => setAddOpen(true)}
+            onGoMine={() => setTab('mine')}
+          />
         ) : (
           <>
             {tab === 'today' && (
@@ -84,16 +119,6 @@ export default function App() {
               <BoardView views={store.goalViews} logs={store.logs} onCheckIn={(id) => setCheckInGoalId(id)} />
             )}
             {tab === 'week' && <WeekReview reviews={store.reviews} onSubmit={store.addReview} />}
-            {tab === 'mine' && (
-              <MineView
-                onExport={store.exportAll}
-                onImport={store.importAll}
-                onLoadSample={loadSample}
-                onClearAll={clearAll}
-                hasSample={store.goals.some((g) => g.isSeed)}
-                repoKind={repo.kind}
-              />
-            )}
           </>
         )}
       </main>
