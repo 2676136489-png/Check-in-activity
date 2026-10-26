@@ -5,7 +5,7 @@
 ![tests](https://img.shields.io/badge/tests-51%20passed-2c6b5c.svg)
 ![lint](https://img.shields.io/badge/lint-eslint%209-3a6b8c.svg)
 
-### 👉 [在线演示 · 点开即用（免登录，无需安装）](https://study-goal-console-39820.app.workbuddy.host/)
+### 👉 [在线演示 · 点开即用（免登录，无需安装）](https://study-goal-console-59328.app.workbuddy.host/)
 
 > 一个「以打卡驱动目标推进」的个人工作台：设定目标 → 每日打卡 → **按近 7 天真实均速推算还剩几天** → 每周四格复盘。
 
@@ -261,7 +261,7 @@ git diff --exit-code -- ../学习目标管理台.html   # 应无输出
 
 ## 部署
 
-**当前线上**：<https://study-goal-console-39820.app.workbuddy.host/>
+**当前线上**：<https://study-goal-console-59328.app.workbuddy.host/>
 
 **工程化版**
 
@@ -271,7 +271,7 @@ cd app && npm run build
 
 `dist/` 是纯静态产物，可直接丢到任意静态托管。已配置 `base: './'`，因此放在**子路径**下也不会出现资源 404 白屏。
 
-**GitHub Pages**：仓库里已经放好了 `.github/workflows/pages.yml`，推到 `main` 就会构建并发布 `app/dist`。需要在仓库 **Settings → Pages → Build and deployment → Source** 里选择 **GitHub Actions**（一次性设置），之后地址是 `https://2676136489-png.github.io/Check-in-activity/`。工作流里带了一条断言：产物不得出现 `src="/..."` 这种绝对路径引用，出现即失败——防止哪天误改 `base` 又变成白屏。
+**GitHub Pages**：`.github/workflows/pages.yml` 负责构建并发布 `app/dist`，站点 Source 已设为 **GitHub Actions**，推到 `main` 自动生效。地址：<https://2676136489-png.github.io/Check-in-activity/>。工作流里带了一条断言：产物不得出现 `src="/..."` 这种绝对路径引用，出现即失败——防止哪天误改 `base` 又变成白屏。
 
 **Vercel**：Framework 选 Vite，Build Command `npm run build`，Output Directory `dist`，Root Directory `app`。
 
