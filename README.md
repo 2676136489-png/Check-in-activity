@@ -7,6 +7,8 @@
 
 ### 👉 [在线演示 · 点开即用（免登录，无需安装）](https://study-goal-console-59328.app.workbuddy.host/)
 
+备用入口：[GitHub Pages](https://2676136489-png.github.io/Check-in-activity/) —— 和主站是同一份构建产物，哪个能打开用哪个。
+
 > 一个「以打卡驱动目标推进」的个人工作台：设定目标 → 每日打卡 → **按近 7 天真实均速推算还剩几天** → 每周四格复盘。
 
 市面上的习惯打卡 App 回答的是「你连续坚持了几天」，这个工具回答的是**「按现在的速度，这本书还要几天读完」**——前者只能让我自我感觉良好，后者才能让我判断今晚要不要多花一小时。整个项目的算法、状态模型和交互都是围绕这一个问题设计的。
@@ -263,6 +265,13 @@ git diff --exit-code -- ../学习目标管理台.html   # 应无输出
 
 **当前线上**：<https://study-goal-console-59328.app.workbuddy.host/>
 
+两个入口的更新方式不一样：
+
+| 入口 | 怎么更新 |
+|---|---|
+| WorkBuddy 主站 | `cd app && npm run pub:sync` 重建 `web-dist/`，再到 WorkBuddy 面板重新发布 |
+| GitHub Pages | 推到 `main` 即可，workflow 会自己构建 `app/dist` |
+
 **工程化版**
 
 ```bash
@@ -270,6 +279,14 @@ cd app && npm run build
 ```
 
 `dist/` 是纯静态产物，可直接丢到任意静态托管。已配置 `base: './'`，因此放在**子路径**下也不会出现资源 404 白屏。
+
+**同步到 WorkBuddy 发布目录**
+
+```bash
+cd app && npm run pub:sync
+```
+
+等于 `build` 之后把 `dist/` 镜像到仓库根的 `web-dist/`，跑完会校验 `index.html` 引用的资源都在产物里、且没有绝对路径，任何一项不过就以非 0 退出。Windows 下也可以直接双击根目录的 `同步线上产物.cmd`。WorkBuddy 发布的是 `web-dist/`，只 build 不同步的话线上还是上一版。
 
 **GitHub Pages**：`.github/workflows/pages.yml` 负责构建并发布 `app/dist`，站点 Source 已设为 **GitHub Actions**，推到 `main` 自动生效。地址：<https://2676136489-png.github.io/Check-in-activity/>。工作流里带了一条断言：产物不得出现 `src="/..."` 这种绝对路径引用，出现即失败——防止哪天误改 `base` 又变成白屏。
 

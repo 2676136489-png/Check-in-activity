@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "smoke": "node scripts/smoke-render.mjs",
     "shots": "node scripts/shots.mjs",
+    "pub:sync": "npm run build && node scripts/sync-web-dist.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

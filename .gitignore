@@ -27,6 +27,12 @@ build/backup_before_clear/
 _remote_check/
 clone_work/
 
+# ---------- 线上发布目录与本机发布元数据 ----------
+# web-dist/ 由 `npm run pub:sync` 从 app/dist 生成，是 WorkBuddy 的发布目录；
+# 产物按内容哈希命名，入库只会制造无意义的大 diff。
+web-dist/
+.wbapp_*.genie
+
 # ---------- 工具链本地元数据（工作日志等，不入库）----------
 .workbuddy/
 

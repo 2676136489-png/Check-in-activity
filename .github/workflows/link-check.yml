@@ -1,0 +1,68 @@
+name: 线上链接巡检
+
+# 站点失效过一次：演示地址换了域名，README 还指着旧的那一个，没人发现，
+# 直到有人点开是 404。这个巡检每天把文档里出现的线上地址挨个请求一遍，
+# 顺便在改动 README / 项目介绍时跑一次，链接一挂就会在 Actions 里红掉。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - '项目介绍.md'
+      - '.github/workflows/link-check.yml'
+  # GitHub Actions 的 cron 用 UTC。01:00 UTC = 09:00 北京时间。
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    name: 探测文档里的线上地址
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 逐个请求，非 200 即失败
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          # 只认两类站点：WorkBuddy 托管域名和 GitHub Pages。
+          urls=$(grep -ohE 'https://[A-Za-z0-9._-]+\.(app\.workbuddy\.host|github\.io)[^ )"<>`]*' \
+                   README.md 项目介绍.md \
+                 | sed 's/[.,;:!?]*$//' \
+                 | sort -u)
+
+          if [ -z "$urls" ]; then
+            echo "::error::文档里没提取到任何线上地址，巡检规则可能失效了，先检查上面的正则。"
+            exit 1
+          fi
+
+          echo "本次巡检 $(printf '%s\n' "$urls" | wc -l) 个地址"
+          echo
+
+          bad=0
+          while read -r url; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -L --max-time 30 "$url" || echo 000)
+
+            # Pages 刚部署完时 CDN 可能还没生效，给一次重试，避免误报
+            if [ "$code" != "200" ]; then
+              sleep 15
+              code=$(curl -s -o /dev/null -w '%{http_code}' -L --max-time 30 "$url" || echo 000)
+            fi
+
+            if [ "$code" = "200" ]; then
+              echo "OK    $code  $url"
+            else
+              echo "FAIL  $code  $url"
+              bad=1
+            fi
+          done <<< "$urls"
+
+          echo
+          if [ "$bad" -ne 0 ]; then
+            echo "::error::有线上地址不可达。多半是换了域名或取消了发布，而文档没跟着改。"
+            exit 1
+          fi
+          echo "全部可达"
