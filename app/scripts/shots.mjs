@@ -37,7 +37,7 @@ async function openWithSample(viewport, dpr, mobile) {
   })
   const page = await ctx.newPage()
   await page.goto(URL_BASE, { waitUntil: 'load' })
-  await page.waitForSelector('text=这里还没有目标', { timeout: 15000 })
+  await page.waitForSelector('text=载入示例数据', { timeout: 15000 })
   await page.click('text=载入示例数据')
   await page.waitForTimeout(900)
   return { ctx, page }
@@ -54,7 +54,12 @@ try {
   // 桌面 · 看板（视口拉高，让 14 天图表完整入镜）
   {
     const { ctx, page } = await openWithSample({ width: 1280, height: 1300 }, 2, false)
-    await page.click('text=看板')
+    await page.evaluate(() => window.scrollTo(0, 0))
+    /* 新版侧栏默认收起，看板入口位于视口外，用脚本直接触发切换 */
+    await page.evaluate(() => {
+      const btn = Array.from(document.querySelectorAll('button')).find((b) => b.innerText.trim() === '看板')
+      if (btn) btn.click()
+    })
     await page.waitForTimeout(700)
     await page.screenshot({ path: path.join(OUT, 'app-board-desktop.png') })
 
